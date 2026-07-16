@@ -41,9 +41,15 @@ class CachingProvider:
         os.makedirs(cache_dir, exist_ok=True)
 
     def _key(self, system: str, prompt: str) -> str:
+        # Include the provider identity and endpoint so the same model+prompt
+        # against a different backend (e.g. two OpenAI-compatible base_urls, or a
+        # different provider) never returns a cross-wired cached answer.
+        provider_id = type(self.inner).__name__
+        base_url = getattr(self.inner, "_base_url", "") or ""
         digest = hashlib.sha256()
         # NUL separators keep the fields unambiguous in the hashed material.
-        digest.update(f"{self.model}\0{system}\0{prompt}".encode("utf-8"))
+        material = f"{provider_id}\0{base_url}\0{self.model}\0{system}\0{prompt}"
+        digest.update(material.encode("utf-8"))
         return digest.hexdigest()
 
     def generate(self, system: str, prompt: str) -> str:

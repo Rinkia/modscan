@@ -9,6 +9,8 @@ from modscan.models import (
     DynamicImport,
 )
 from modscan.parser import parse_codebase, parse_file
+from modscan.graph import ExtensionGraph, Seam, build_graph
+from modscan.detector import ExtensionPoint, detect_extension_points
 
 __all__ = [
     "Codebase",
@@ -19,4 +21,9 @@ __all__ = [
     "DynamicImport",
     "parse_codebase",
     "parse_file",
+    "ExtensionGraph",
+    "Seam",
+    "build_graph",
+    "ExtensionPoint",
+    "detect_extension_points",
 ]

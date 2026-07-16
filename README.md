@@ -84,7 +84,9 @@ modscan ./path/to/project
 
 ## License
 
-TBD.
+[Apache License 2.0](LICENSE). Permissive, with an explicit patent grant — the
+extension-point detection is the core value, so the patent clause is worth the
+extra verbosity. See also [`NOTICE`](NOTICE).
 
 ---
 

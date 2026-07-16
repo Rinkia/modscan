@@ -162,8 +162,11 @@ def _example_filename(point_id: str, ext: str) -> str:
     return f"{safe}{ext}"
 
 
+_LANGUAGE_EXT = {"python": ".py", "javascript": ".js", "typescript": ".ts"}
+
+
 def _example_ext(language: str) -> str:
-    return ".py" if language == "python" else ".ts"
+    return _LANGUAGE_EXT.get(language, ".ts")
 
 
 def generate_docs(
@@ -298,6 +301,11 @@ def _render_guide(generated: list[GeneratedPoint]) -> str:
         if gp.example_status == "unverified":
             lines.append("> WARNING: this example could not be validated automatically.")
             lines.append("")
-        fence = "python" if gp.example_path.endswith(".py") else "typescript"
+        if gp.example_path.endswith(".py"):
+            fence = "python"
+        elif gp.example_path.endswith(".js"):
+            fence = "javascript"
+        else:
+            fence = "typescript"
         lines += [f"```{fence}", gp.example_code.strip(), "```", ""]
     return "\n".join(lines) + "\n"

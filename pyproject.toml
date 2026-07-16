@@ -9,6 +9,7 @@ dependencies = []
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.40"]
+typescript = ["tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
 
 [project.scripts]
 modscan = "modscan.cli:main"

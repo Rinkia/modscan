@@ -65,6 +65,14 @@ generator so every later stage is measurable against a plugin that really loads.
 > deliberately **out of the MVP**. MODScan starts with code you are allowed to
 > read and modify.
 
+## Languages
+
+Python is the primary, fully-integrated target. **TypeScript/JavaScript parsing
+is experimental** (via tree-sitter): it feeds the graph and detector, so
+extension points and docs work, but example *execution*-validation is Python-only
+for now. Install with `pip install modscan[typescript]`; the front-end registers
+under `typescript` and `javascript`.
+
 ## LLM providers
 
 The doc generator is provider-agnostic. Pick your model; SDKs are optional deps

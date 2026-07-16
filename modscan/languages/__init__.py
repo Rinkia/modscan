@@ -29,6 +29,9 @@ from modscan.languages.base import (
     register_language,
 )
 from modscan.languages import python as _python  # noqa: F401 — registers "python"
+from modscan.languages import (  # noqa: F401 — registers "typescript"/"javascript"
+    typescript as _typescript,
+)
 
 __all__ = [
     "LanguageParser",

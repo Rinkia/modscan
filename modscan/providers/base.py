@@ -30,6 +30,8 @@ DEFAULT_MODEL = "claude-opus-4-8"
 # Provider names accepted by get_provider().
 _ANTHROPIC = "anthropic"
 _OPENAI_COMPAT = {"openai", "openai-compat", "openai_compat"}
+_GEMINI = "gemini"
+_GEMINI_DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 @runtime_checkable
@@ -78,20 +80,26 @@ def get_provider(
     - "anthropic" -> native Claude adapter
     - "openai" / "openai-compat" -> OpenAI-compatible adapter (set `base_url` to
       target OpenAI, Gemini, OpenRouter, DeepSeek, Mistral, Ollama, etc.)
+    - "gemini" -> native Google Gemini adapter
 
     The SDK is imported lazily inside the adapter, so an unknown-but-uninstalled
     provider only fails when you actually call it.
     """
-    model = model or DEFAULT_MODEL
     key = name.lower()
     if key == _ANTHROPIC:
         from modscan.providers.anthropic import AnthropicProvider
 
-        return AnthropicProvider(model=model, api_key=api_key)
+        return AnthropicProvider(model=model or DEFAULT_MODEL, api_key=api_key)
     if key in _OPENAI_COMPAT:
         from modscan.providers.openai_compat import OpenAICompatProvider
 
-        return OpenAICompatProvider(model=model, api_key=api_key, base_url=base_url)
+        return OpenAICompatProvider(
+            model=model or DEFAULT_MODEL, api_key=api_key, base_url=base_url
+        )
+    if key == _GEMINI:
+        from modscan.providers.gemini import GeminiProvider
+
+        return GeminiProvider(model=model or _GEMINI_DEFAULT_MODEL, api_key=api_key)
     raise ValueError(
-        f"unknown provider {name!r}; expected 'anthropic' or 'openai'"
+        f"unknown provider {name!r}; expected 'anthropic', 'openai', or 'gemini'"
     )

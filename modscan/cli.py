@@ -41,7 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--out", default="modding-docs", help="output directory (default: modding-docs)"
     )
     parser.add_argument(
-        "--provider", default="anthropic", help="LLM provider: anthropic | openai"
+        "--provider",
+        default="anthropic",
+        help="LLM provider: anthropic | openai | gemini",
     )
     parser.add_argument("--model", default=None, help="model id (default: provider's default)")
     parser.add_argument(

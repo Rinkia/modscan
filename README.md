@@ -75,6 +75,7 @@ never hardcoded.
 |---|---|---|
 | `anthropic` (default) | `pip install modscan[anthropic]` | Claude (default model: `claude-opus-4-8`) |
 | `openai` | `pip install modscan[openai]` | OpenAI, plus any OpenAI-compatible endpoint via `base_url`: Gemini, OpenRouter, DeepSeek, Mistral, local Ollama / LM Studio |
+| `gemini` | `pip install modscan[gemini]` | Google Gemini (native SDK; also reachable via the `openai` adapter + `base_url`) |
 
 ## Output
 

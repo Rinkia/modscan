@@ -45,6 +45,12 @@ def test_providers() -> None:
         assert type(oai).__name__ == "OpenAICompatProvider"
         assert oai.model == "gpt-x"
 
+    # gemini resolves and defaults to a Gemini model (not the Claude default)
+    gem = get_provider("gemini")
+    assert type(gem).__name__ == "GeminiProvider"
+    assert gem.model.startswith("gemini-")
+    assert get_provider("gemini", model="gemini-1.5-pro").model == "gemini-1.5-pro"
+
     # unknown provider fails clearly
     try:
         get_provider("nope")

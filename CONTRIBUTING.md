@@ -29,7 +29,15 @@ done
 
 They are also discoverable by `pytest` if you prefer. **The suite makes no
 network calls** — LLM providers are exercised through `FakeProvider`. Never add a
-test that hits a real API.
+test that hits a real API to the always-on suite.
+
+The one exception is `tests/test_live_smoke.py`: an opt-in end-to-end check that
+makes a **real, paid LLM call**. It is off by default and skips unless you set
+`MODSCAN_LIVE=1` and provide a provider key:
+
+```bash
+MODSCAN_LIVE=1 ANTHROPIC_API_KEY=sk-ant-... python tests/test_live_smoke.py
+```
 
 ## Architecture (know before you change)
 

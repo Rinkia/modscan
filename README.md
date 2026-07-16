@@ -9,7 +9,8 @@ analysis. It doesn't just describe the code (Doxygen already does that); it maps
 the **seams** a modder actually hooks into, then writes a "how to build a plugin"
 guide and a **working example plugin that it validates by loading it for real**.
 
-> Status: **early / pre-MVP.** Design and plan are in place; implementation is starting.
+> Status: **MVP core complete.** All five analysis layers work (parse → graph →
+> detect → validate → generate). The CLI wrapper is the next step.
 
 ---
 
@@ -64,15 +65,39 @@ generator so every later stage is measurable against a plugin that really loads.
 > deliberately **out of the MVP**. MODScan starts with code you are allowed to
 > read and modify.
 
+## LLM providers
+
+The doc generator is provider-agnostic. Pick your model; SDKs are optional deps
+imported lazily, so you install only what you use. API keys come from env vars,
+never hardcoded.
+
+| Provider | Install | Covers |
+|---|---|---|
+| `anthropic` (default) | `pip install modscan[anthropic]` | Claude (default model: `claude-opus-4-8`) |
+| `openai` | `pip install modscan[openai]` | OpenAI, plus any OpenAI-compatible endpoint via `base_url`: Gemini, OpenRouter, DeepSeek, Mistral, local Ollama / LM Studio |
+
+## Output
+
+Two artifacts, one for humans and one for tools:
+
+- `modding-docs/*.md` — architecture overview + per-seam plugin guide with a
+  validated example plugin.
+- `modding-docs/extension-points.json` — a versioned, machine-readable manifest
+  of every validated extension point. This is the contract that will power
+  `modscan scaffold <id>`, editor tooling, and breaking-change diffs.
+
+Every generated example is re-loaded against the target to confirm it works;
+ones that can't be validated are clearly marked `unverified`.
+
 ## Roadmap
 
-1. AST parser + extension graph (Python) on a real plugin-based repo
-2. Extension detector + moddability ranking (measure precision/recall by hand)
-3. Validator — load a real example plugin against a detected seam
-4. Doc generator (LLM, grounded on the graph)
-5. `modscan ./path` CLI wrapper, end to end
-6. Later: more languages (JS/TS), web UI, and — only with proper legal
-   guardrails — the binary case
+1. ✅ AST parser + extension graph (Python)
+2. ✅ Extension detector + moddability ranking
+3. ✅ Validator — load a real example plugin against a detected seam
+4. ✅ Doc generator (LLM, grounded) — Markdown + JSON manifest
+5. `modscan ./path` CLI wrapper, end to end — **next**
+6. Later: `modscan scaffold <id>` (consumes the JSON), more languages (JS/TS),
+   web UI, and — only with proper legal guardrails — the binary case
 
 ## Usage (planned)
 

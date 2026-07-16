@@ -26,6 +26,9 @@ from modscan.parser import parse_codebase, parse_file
 from modscan.graph import ExtensionGraph, Seam, build_graph
 from modscan.detector import ExtensionPoint, detect_extension_points
 from modscan.validator import ValidationResult, validate_point, validate_points
+from modscan.factblocks import FactBlock, build_fact_block, render_fact_block
+from modscan.providers import DEFAULT_MODEL, FakeProvider, Provider, get_provider
+from modscan.docgen import DocReport, GeneratedPoint, generate_docs
 
 __all__ = [
     "Codebase",
@@ -44,4 +47,14 @@ __all__ = [
     "ValidationResult",
     "validate_point",
     "validate_points",
+    "FactBlock",
+    "build_fact_block",
+    "render_fact_block",
+    "Provider",
+    "FakeProvider",
+    "get_provider",
+    "DEFAULT_MODEL",
+    "DocReport",
+    "GeneratedPoint",
+    "generate_docs",
 ]

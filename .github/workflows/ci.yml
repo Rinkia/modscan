@@ -26,9 +26,11 @@ jobs:
 
       - name: Run self-checks
         run: |
-          for t in parser detector validator providers factblocks manifest docgen cli scaffold; do
-            echo "== test_$t =="
-            python tests/test_$t.py
+          # Auto-discover every test module so new ones run without editing CI.
+          # test_live_smoke is opt-in (real API) and skips unless MODSCAN_LIVE=1.
+          for f in tests/test_*.py; do
+            echo "== $f =="
+            python "$f"
           done
 
       - name: Import works without LLM SDKs

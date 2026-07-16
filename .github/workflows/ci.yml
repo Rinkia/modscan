@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  self-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install (core only, no LLM SDKs)
+        run: python -m pip install -e .
+
+      - name: Run self-checks
+        run: |
+          # Auto-discover every test module so new ones run without editing CI.
+          # test_live_smoke is opt-in (real API) and skips unless MODSCAN_LIVE=1.
+          for f in tests/test_*.py; do
+            echo "== $f =="
+            python "$f"
+          done
+
+      - name: Import works without LLM SDKs
+        run: python -c "import modscan; print('modscan import OK', len(modscan.__all__), 'exports')"

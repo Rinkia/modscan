@@ -27,7 +27,7 @@ import sys
 
 from modscan.docgen import generate_docs
 from modscan.providers import Provider, get_provider
-from modscan.scaffold import scaffold
+from modscan.scaffold import scaffold, scaffold_all
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -70,7 +70,12 @@ def build_scaffold_parser() -> argparse.ArgumentParser:
         description="Generate a plugin skeleton for an extension point id, "
         "using a previously generated extension-points.json manifest.",
     )
-    parser.add_argument("point_id", help="extension point id, e.g. 'pkg.mod:Symbol'")
+    parser.add_argument(
+        "point_id", nargs="?", help="extension point id, e.g. 'pkg.mod:Symbol'"
+    )
+    parser.add_argument(
+        "--all", action="store_true", help="scaffold every point in the manifest"
+    )
     parser.add_argument(
         "--manifest",
         default=os.path.join("modding-docs", "extension-points.json"),
@@ -84,6 +89,13 @@ def _main_scaffold(argv: list[str]) -> int:
     args = build_scaffold_parser().parse_args(argv)
     if not os.path.isfile(args.manifest):
         print(f"error: manifest not found: {args.manifest}", file=sys.stderr)
+        return 2
+    if args.all:
+        paths = scaffold_all(args.manifest, args.out)
+        print(f"Wrote {len(paths)} plugin skeleton(s) to {args.out}")
+        return 0
+    if not args.point_id:
+        print("error: provide a point id or --all", file=sys.stderr)
         return 2
     try:
         path = scaffold(args.manifest, args.point_id, args.out)

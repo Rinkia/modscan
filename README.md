@@ -125,6 +125,8 @@ reads the JSON manifest):
 ```bash
 modscan scaffold "pkg.mod:Symbol" --manifest modding-docs/extension-points.json
 # -> writes pkg_mod_Symbol_plugin.py: a concrete subclass with stubbed methods
+
+modscan scaffold --all --out plugins/   # skeletons for every documented point
 ```
 
 > **Trust note:** by default MODScan imports and executes code under the scanned

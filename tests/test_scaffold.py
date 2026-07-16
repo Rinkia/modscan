@@ -23,7 +23,7 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modscan.scaffold import find_point, render_scaffold, scaffold  # noqa: E402
+from modscan.scaffold import find_point, render_scaffold, scaffold, scaffold_all  # noqa: E402
 from modscan.cli import main  # noqa: E402
 
 MANIFEST = {
@@ -112,10 +112,34 @@ def test_cli_scaffold_subcommand() -> None:
         assert main(["scaffold", "x:y", "--manifest", manifest_path]) == 1
 
 
+def test_scaffold_all_writes_every_point() -> None:
+    with tempfile.TemporaryDirectory() as root:
+        manifest_path = _write_manifest(root)
+        out = os.path.join(root, "gen")
+        paths = scaffold_all(manifest_path, out)
+        assert len(paths) == 2
+        names = sorted(os.path.basename(p) for p in paths)
+        assert names == ["pkg_api_Exporter_plugin.py", "pkg_api_register_plugin.py"]
+        for p in paths:
+            compile(open(p, encoding="utf-8").read(), p, "exec")
+
+
+def test_cli_scaffold_all_and_missing_id() -> None:
+    with tempfile.TemporaryDirectory() as root:
+        manifest_path = _write_manifest(root)
+        out = os.path.join(root, "out")
+        assert main(["scaffold", "--all", "--manifest", manifest_path, "--out", out]) == 0
+        assert len(os.listdir(out)) == 2
+        # neither an id nor --all -> exit 2
+        assert main(["scaffold", "--manifest", manifest_path]) == 2
+
+
 if __name__ == "__main__":
     test_render_subclass_is_valid_python()
     test_render_template_for_function()
     test_scaffold_writes_file()
     test_find_point_unknown_lists_ids()
     test_cli_scaffold_subcommand()
+    test_scaffold_all_writes_every_point()
+    test_cli_scaffold_all_and_missing_id()
     print("OK: scaffold self-check passed")

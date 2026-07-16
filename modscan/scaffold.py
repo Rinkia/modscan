@@ -100,14 +100,26 @@ def _safe(point_id: str) -> str:
     return "".join(c if c.isalnum() else "_" for c in point_id)
 
 
+def _write_point(point: dict, out_dir: str) -> str:
+    os.makedirs(out_dir, exist_ok=True)
+    path = os.path.join(out_dir, f"{_safe(point['id'])}_plugin.py")
+    with open(path, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(render_scaffold(point))
+    return path
+
+
 def scaffold(manifest_path: str, point_id: str, out_dir: str = ".") -> str:
     """Write a plugin skeleton for `point_id`. Returns the written file path."""
     manifest = load_manifest(manifest_path)
     point = find_point(manifest, point_id)
-    code = render_scaffold(point)
+    return _write_point(point, out_dir)
 
-    os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, f"{_safe(point_id)}_plugin.py")
-    with open(path, "w", encoding="utf-8", newline="\n") as fh:
-        fh.write(code)
-    return path
+
+def scaffold_all(manifest_path: str, out_dir: str = ".") -> list[str]:
+    """Write a plugin skeleton for every point in the manifest.
+
+    Returns the list of written file paths (sorted by point id).
+    """
+    manifest = load_manifest(manifest_path)
+    points = sorted(manifest.get("points", []), key=lambda p: p.get("id", ""))
+    return [_write_point(point, out_dir) for point in points]

@@ -1,5 +1,9 @@
 # MODScan
 
+[![CI](https://github.com/Rinkia/modscan/actions/workflows/ci.yml/badge.svg)](https://github.com/Rinkia/modscan/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
+
 **Scan a codebase, get everything you need to write plugins and mods for it.**
 
 MODScan reads a source-available project, finds where it can be *extended* —

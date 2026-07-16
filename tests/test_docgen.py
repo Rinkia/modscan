@@ -186,7 +186,40 @@ def test_docgen_protocol_seam_does_not_crash() -> None:
     print("OK: docgen protocol-seam regression passed")
 
 
+REG_SRC = "__all__ = ['register']\n\n\ndef register(fn):\n    return fn\n"
+
+
+def test_docgen_executed_status_for_registration() -> None:
+    """Non-subclass seams get 'executed' when the example loads clean."""
+    pkg = "dgexec"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        open(os.path.join(d, "__init__.py"), "w").close()
+        with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write(REG_SRC)
+        try:
+            example = (
+                f"```python\nfrom {pkg}.api import register\n"
+                "@register\n"
+                "def my_hook():\n"
+                "    return 1\n```"
+            )
+            provider = FakeProvider(
+                lambda s, p: example if "EXAMPLE plugin" in p else "prose"
+            )
+            out = os.path.join(root, "modding-docs")
+            report = generate_docs(root, provider, out, min_score=0.5)
+            reg = next(p for p in report.points if p.fact.symbol == "register")
+            assert reg.example_status == "executed", reg.example_status
+        finally:
+            _cleanup(pkg)
+
+    print("OK: docgen executed-status self-check passed")
+
+
 if __name__ == "__main__":
     test_docgen_verified()
     test_docgen_unverified_retries()
     test_docgen_protocol_seam_does_not_crash()
+    test_docgen_executed_status_for_registration()

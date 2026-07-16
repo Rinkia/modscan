@@ -54,9 +54,11 @@ _MIN_RETRIES = 3
 _MAX_RETRIES = 5
 _DEFAULT_RETRIES = 4
 
-# Example statuses. "verified" = subclass executed & instantiated; "compiled" =
-# syntactically valid (bar for non-subclass seams); "unverified" = neither.
-_OK_STATUSES = ("verified", "compiled")
+# Example statuses, strongest first. "verified" = subclass executed &
+# instantiated; "executed" = non-subclass example imported/ran clean; "compiled"
+# = syntactically valid only (used when validation is disabled); "unverified" =
+# none held after all retries.
+_OK_STATUSES = ("verified", "executed", "compiled")
 
 
 @dataclass
@@ -127,15 +129,29 @@ def _exec_and_instantiate(root: str, fb: FactBlock, code: str) -> bool:
     return False
 
 
+def _exec_module(root: str, code: str) -> bool:
+    """Exec the example so imports resolve and module-level code runs clean."""
+    try:
+        with _sys_path(root):
+            exec(compile(code, "<modscan-example>", "exec"), {})  # noqa: S102
+    except Exception:  # noqa: BLE001 — any failure means the example didn't load
+        return False
+    return True
+
+
 def _verify_example(root: str, fb: FactBlock, code: str, validate: bool) -> str:
-    """Return an example status: verified | compiled | invalid."""
+    """Return an example status: verified | executed | compiled | invalid."""
     try:
         compile(code, "<modscan-example>", "exec")
     except SyntaxError:
         return "invalid"
-    if validate and fb.kind in ("class", "abstract_class"):
+    if not validate:
+        return "compiled"
+    if fb.kind in ("class", "abstract_class"):
         return "verified" if _exec_and_instantiate(root, fb, code) else "invalid"
-    return "compiled"
+    # hook/registration/api: no subclass to instantiate, but we can still load
+    # the example to catch bad imports and module-level errors.
+    return "executed" if _exec_module(root, code) else "invalid"
 
 
 def _make_example(
@@ -248,9 +264,7 @@ def _render_index(overview: str, generated: list[GeneratedPoint]) -> str:
         "| --- | --- | --- | --- |",
     ]
     for gp in generated:
-        badge = {"verified": "verified", "compiled": "compiled"}.get(
-            gp.example_status, "UNVERIFIED"
-        )
+        badge = "UNVERIFIED" if gp.example_status == "unverified" else gp.example_status
         lines.append(
             f"| `{gp.fact.point_id}` | {gp.fact.category} | "
             f"{gp.fact.module}:{gp.fact.lineno} | {badge} |"

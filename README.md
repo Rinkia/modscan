@@ -131,6 +131,23 @@ modscan scaffold "pkg.mod:Symbol" --manifest modding-docs/extension-points.json
 > path (and runs generated examples) to validate that plugins really load. Run it
 > only on code you trust, or pass `--no-validate-examples`.
 
+## Contributing
+
+Contributions welcome — MODScan is designed to be easy to extend. Start with
+[CONTRIBUTING.md](CONTRIBUTING.md), then pick up a
+[**good first issue**](https://github.com/Rinkia/modscan/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
+
+Each layer is a clean seam you can extend on its own:
+
+- **New detection heuristics** — add hook/registration name patterns or class
+  role suffixes in `detector.py`.
+- **New languages** — implement a `LanguageParser` (see `languages/`) that emits
+  the shared `Codebase` model; the graph, detector, and docs come for free.
+- **New LLM providers** — add a thin adapter under `providers/`.
+
+Tests are framework-free and offline (`python tests/test_*.py`) — no API key, no
+network. The golden rule: facts come from the parser, prose from the LLM.
+
 ## License
 
 [Apache License 2.0](LICENSE). Permissive, with an explicit patent grant — the

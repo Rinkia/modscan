@@ -24,10 +24,18 @@ from __future__ import annotations
 
 import os
 
+from modscan.providers.base import DEFAULT_MAX_TOKENS
+
 
 class GeminiProvider:
-    def __init__(self, model: str, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        api_key: str | None = None,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+    ) -> None:
         self.model = model
+        self.max_tokens = max_tokens
         self._api_key = (
             api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         )
@@ -43,5 +51,8 @@ class GeminiProvider:
 
         genai.configure(api_key=self._api_key)
         client = genai.GenerativeModel(self.model, system_instruction=system)
-        response = client.generate_content(prompt)
+        response = client.generate_content(
+            prompt,
+            generation_config={"max_output_tokens": self.max_tokens},
+        )
         return response.text or ""

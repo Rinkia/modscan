@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import os
 
+from modscan.providers.base import DEFAULT_MAX_TOKENS
+
 
 class OpenAICompatProvider:
     def __init__(
@@ -31,8 +33,10 @@ class OpenAICompatProvider:
         model: str,
         api_key: str | None = None,
         base_url: str | None = None,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> None:
         self.model = model
+        self.max_tokens = max_tokens
         self._api_key = api_key or os.environ.get("OPENAI_API_KEY")
         self._base_url = base_url  # None -> the SDK's default (api.openai.com)
 
@@ -48,6 +52,7 @@ class OpenAICompatProvider:
         client = openai.OpenAI(api_key=self._api_key, base_url=self._base_url)
         response = client.chat.completions.create(
             model=self.model,
+            max_tokens=self.max_tokens,
             messages=[
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},

@@ -21,5 +21,8 @@ Thumbs.db
 # Output
 modding-docs/
 
+# Showcase LLM response cache (the showcase OUTPUT is meant to be committed)
+.showcase-cache/
+
 # Local planning docs (kept out of the public repo)
 .claude/

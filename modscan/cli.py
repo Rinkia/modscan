@@ -30,7 +30,14 @@ import json
 from modscan.config_scan import find_config_points, render_config_markdown
 from modscan.diff import diff_manifests, render_diff_markdown
 from modscan.docgen import generate_docs
-from modscan.providers import CachingProvider, Provider, get_provider
+from modscan.providers import (
+    BudgetExceeded,
+    BudgetProvider,
+    CachingProvider,
+    Provider,
+    get_provider,
+)
+from modscan.providers.base import DEFAULT_MAX_TOKENS
 from modscan.scaffold import scaffold, scaffold_all
 
 
@@ -83,6 +90,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=1,
         help="parallel LLM calls (default: 1). The run is dominated by network "
         "round-trips; raising this is the main speed-up",
+    )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=DEFAULT_MAX_TOKENS,
+        help=f"cap tokens generated per LLM call (default: {DEFAULT_MAX_TOKENS})",
+    )
+    parser.add_argument(
+        "--max-calls",
+        type=int,
+        default=None,
+        help="hard ceiling on LLM calls for this run; stops before exceeding it. "
+        "A run makes 1 + points x (1..retries) calls",
     )
     parser.add_argument(
         "--cache-dir",
@@ -231,10 +251,21 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     try:
-        provider = get_provider(args.provider, model=args.model, base_url=args.base_url)
+        provider = get_provider(
+            args.provider,
+            model=args.model,
+            base_url=args.base_url,
+            max_tokens=args.max_tokens,
+        )
+        # Order matters: cache first, so a cached response never spends budget.
         if args.cache_dir:
             provider = CachingProvider(provider, args.cache_dir)
+        if args.max_calls is not None:
+            provider = BudgetProvider(provider, args.max_calls)
         return run(args, provider)
+    except BudgetExceeded as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 3
     except Exception as exc:  # noqa: BLE001 — top-level CLI guard, report cleanly
         print(f"error: {exc}", file=sys.stderr)
         return 1

@@ -15,11 +15,13 @@
 """Pluggable LLM providers for MODScan's doc generator (layer 4)."""
 
 from modscan.providers.base import (
+    DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     FakeProvider,
     Provider,
     get_provider,
 )
+from modscan.providers.budget import BudgetExceeded, BudgetProvider
 from modscan.providers.cache import CachingProvider
 
 __all__ = [
@@ -28,4 +30,7 @@ __all__ = [
     "get_provider",
     "DEFAULT_MODEL",
     "CachingProvider",
+    "BudgetProvider",
+    "BudgetExceeded",
+    "DEFAULT_MAX_TOKENS",
 ]

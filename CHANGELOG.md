@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **Spend controls for LLM runs.** `--max-tokens` caps tokens generated per
+  call, and `--max-calls` sets a hard ceiling on calls for the whole run,
+  refusing to send call N+1 rather than silently producing a truncated
+  document. Combine with `--cache-dir` so re-runs while tuning flags are free.
+- `examples/generate_showcase.py` — generate a committable example run against a
+  real project. Previews the detected points for free with `--dry-run`, prints
+  the worst-case call count, requires `--yes` before spending, and caps itself
+  at its own estimate.
+
+### Fixed
+
+- **The OpenAI-compatible and Gemini adapters sent no token limit at all**, so a
+  runaway response was unbounded. Every adapter now applies `DEFAULT_MAX_TOKENS`
+  (4096) unless told otherwise; previously only the Anthropic one did.
 
 ## [0.1.0] - 2026-07-20
 

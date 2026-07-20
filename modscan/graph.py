@@ -30,18 +30,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from modscan.models import Codebase, DynamicImport
-
-
-@dataclass(frozen=True)
-class Seam:
-    """A single candidate extension point, flattened across the codebase."""
-
-    kind: str  # "function" | "class" | "abstract_class" | "dynamic_import"
-    module: str  # owning module qualname
-    name: str  # symbol name (or dynamic-import kind)
-    lineno: int
-    detail: str = ""  # bases for classes, decorators, dynamic arg, etc.
+from modscan.models import Codebase, DynamicImport, Seam
 
 
 @dataclass

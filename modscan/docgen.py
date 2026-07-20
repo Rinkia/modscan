@@ -47,6 +47,7 @@ from modscan.fsutil import slugify
 from modscan.graph import build_graph
 from modscan.languages import get_language_parser
 from modscan.manifest import build_manifest, write_manifest
+from modscan.models import ExampleStatus
 from modscan.prompts import SYSTEM, architecture_prompt, example_prompt, guide_prompt
 from modscan.providers.base import Provider
 from modscan.sandbox import validate_in_sandbox
@@ -57,11 +58,13 @@ _MIN_RETRIES = 3
 _MAX_RETRIES = 5
 _DEFAULT_RETRIES = 4
 
-# Example statuses, strongest first. "verified" = subclass executed &
-# instantiated; "executed" = non-subclass example imported/ran clean; "compiled"
-# = syntactically valid only (used when validation is disabled); "unverified" =
-# none held after all retries.
-_OK_STATUSES = ("verified", "executed", "compiled")
+# Statuses that end the retry loop, strongest first. See models.ExampleStatus
+# for what each one means.
+_OK_STATUSES = (
+    ExampleStatus.VERIFIED,
+    ExampleStatus.EXECUTED,
+    ExampleStatus.COMPILED,
+)
 
 
 @dataclass
@@ -69,7 +72,7 @@ class GeneratedPoint:
     fact: FactBlock
     guide: str
     example_code: str
-    example_status: str
+    example_status: ExampleStatus
     example_path: str
 
 
@@ -82,7 +85,7 @@ class DocReport:
 
     @property
     def verified_count(self) -> int:
-        return sum(1 for p in self.points if p.example_status == "verified")
+        return sum(1 for p in self.points if p.example_status == ExampleStatus.VERIFIED)
 
 
 def _extract_code(raw: str) -> str:
@@ -101,7 +104,7 @@ def _extract_code(raw: str) -> str:
 
 def _verify_example(
     root: str, fb: FactBlock, code: str, validate: bool, sandbox: bool
-) -> str:
+) -> ExampleStatus:
     """Return an example status: verified | executed | compiled | invalid.
 
     Loading/execution is delegated to `execution.py` (or, with `sandbox` set, to
@@ -111,9 +114,9 @@ def _verify_example(
     try:
         compile(code, "<modscan-example>", "exec")
     except SyntaxError:
-        return "invalid"
+        return ExampleStatus.INVALID
     if not validate:
-        return "compiled"
+        return ExampleStatus.COMPILED
 
     is_subclass_seam = fb.kind in SUBCLASS_KINDS
     if sandbox:
@@ -126,8 +129,8 @@ def _verify_example(
         ok = example_loads(root, code)
 
     if not ok:
-        return "invalid"
-    return "verified" if is_subclass_seam else "executed"
+        return ExampleStatus.INVALID
+    return ExampleStatus.VERIFIED if is_subclass_seam else ExampleStatus.EXECUTED
 
 
 def _make_example(
@@ -137,7 +140,7 @@ def _make_example(
     retries: int,
     validate: bool,
     sandbox: bool,
-) -> tuple[str, str]:
+) -> tuple[str, ExampleStatus]:
     """Generate and validate an example plugin, retrying up to `retries` times."""
     code = ""
     for _ in range(retries):
@@ -145,7 +148,7 @@ def _make_example(
         status = _verify_example(root, fb, code, validate, sandbox)
         if status in _OK_STATUSES:
             return code, status
-    return code, "unverified"
+    return code, ExampleStatus.UNVERIFIED
 
 
 def _dependency_summary(dependencies: dict[str, set[str]]) -> str:
@@ -220,7 +223,7 @@ def generate_docs(
             )
         else:
             code = _extract_code(provider.generate(SYSTEM, example_prompt(fb)))
-            status = "generated"  # written by the LLM, not executed
+            status = ExampleStatus.GENERATED  # written by the LLM, not executed
         generated.append(
             GeneratedPoint(
                 fact=fb,
@@ -274,7 +277,11 @@ def _render_index(overview: str, generated: list[GeneratedPoint]) -> str:
         "| --- | --- | --- | --- |",
     ]
     for gp in generated:
-        badge = "UNVERIFIED" if gp.example_status == "unverified" else gp.example_status
+        badge = (
+            "UNVERIFIED"
+            if gp.example_status == ExampleStatus.UNVERIFIED
+            else gp.example_status
+        )
         lines.append(
             f"| `{gp.fact.point_id}` | {gp.fact.category} | "
             f"{gp.fact.module}:{gp.fact.lineno} | {badge} |"
@@ -298,7 +305,7 @@ def _render_guide(generated: list[GeneratedPoint]) -> str:
             "### Example",
             "",
         ]
-        if gp.example_status == "unverified":
+        if gp.example_status == ExampleStatus.UNVERIFIED:
             lines.append("> WARNING: this example could not be validated automatically.")
             lines.append("")
         if gp.example_path.endswith(".py"):

@@ -76,7 +76,14 @@ If this heuristic is ever attempted, it must be measured against pluggy first.
    the benchmark skips rather than reporting a misleading score against another.
 3. For each seam, find where it is **defined** (the module containing the
    `class` statement), not where it is re-exported. Label ids are
-   `defining.module:Symbol`, matching what the parser produces.
+   `fully.qualified.module:Symbol` — `pluggy._manager:PluginManager`, not
+   `_manager:PluginManager`.
+
+   The parser does **not** emit this form. It reports module paths relative to
+   the directory it was pointed at, so scanning an installed `pluggy` yields
+   `_manager`, and scanning `sqlalchemy` yields `engine.cursor`. The scorer
+   prefixes the target name before comparing. Labels use the qualified form
+   because it is the one a human can verify against the documentation.
 4. Write a justification naming the documentation that presents it as
    extensible. "It looks important" is not a justification.
 5. Run `python tests/test_benchmark_labels.py`.

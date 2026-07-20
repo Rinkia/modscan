@@ -1,5 +1,6 @@
 # MODScan
 
+[![PyPI](https://img.shields.io/pypi/v/modscan.svg)](https://pypi.org/project/modscan/)
 [![CI](https://github.com/Rinkia/modscan/actions/workflows/ci.yml/badge.svg)](https://github.com/Rinkia/modscan/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](pyproject.toml)
@@ -121,7 +122,7 @@ ones that can't be validated are clearly marked `unverified`.
 ## Usage
 
 ```bash
-pip install -e .[anthropic]        # or .[openai]
+pip install modscan[anthropic]     # or [openai], [gemini], [typescript]
 export ANTHROPIC_API_KEY=sk-...    # keys come from the environment, never flags
 
 modscan ./path/to/project

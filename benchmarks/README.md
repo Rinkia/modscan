@@ -88,6 +88,55 @@ If this heuristic is ever attempted, it must be measured against pluggy first.
    extensible. "It looks important" is not a justification.
 5. Run `python tests/test_benchmark_labels.py`.
 
+## Baseline
+
+Measured 2026-07-20 at the pinned versions, before any ranking change.
+
+| Target | Candidates | Labels | Rank of each label | recall@10 | Median rank |
+|---|---|---|---|---|---|
+| pluggy 1.6.0 | 20 | 3 | 5, 6, 14 | 2/3 | 6 |
+| click 8.4.2 | 152 | 4 | **1, 2**, 38, 39 | 2/4 | 20.5 |
+| SQLAlchemy 2.0.51 | 2092 | 5 | 620, 1287, 1369, 1628, 1631 | 0/5 | 1369 |
+
+Aggregate recall@10: **4/12**.
+
+Three things this measurement settled:
+
+- **pluggy's public API is buried, not missing.** `PluginManager`,
+  `HookimplMarker` and `HookspecMarker` are all detected. The defect is
+  ordering, not discovery — a smaller problem than it looked.
+- **click is half right.** `Parameter` and `ParamType` rank 1 and 2. `Command`
+  and `Group` are equally documented and sit at 38 and 39.
+- **Score ties dominate.** Ten of the twelve labels score exactly `0.1`, the
+  signal-sum floor that hundreds of symbols share; only click's `Parameter` and
+  `ParamType` reach 0.7. Ranks inside that floor are decided by traversal order,
+  not evidence, so SQLAlchemy's ordering today is *arbitrary* rather than wrong.
+
+## What gets reported
+
+**k = 10.**
+
+**Headline: recall@10 aggregated over all twelve labels.** Thirteen levels
+rather than the four a single small target gives, and it does not reward
+skewing effort at the easiest target.
+
+**Per-target recall@10 is a regression guard, not a target to maximise.** click
+is the canary — it already works, and it must not fall.
+
+**Median rank of the labelled seams is reported alongside.** It is continuous
+and moves before recall does. This matters because recall@10 is *blind* to real
+progress on SQLAlchemy for a long time: labels sit at ranks 620–1631, so a
+change lifting `TypeDecorator` to 150 is a large improvement that recall@10
+still reports as `0/5`. Several good iterations reading as "no progress" is how
+a metric dies of disuse.
+
+**precision@10 is reported but is not the figure to optimise.** With partial
+label lists it has a structural ceiling — SQLAlchemy has five labels, so p@10
+cannot exceed 0.5 even for a perfect ranker. A metric that cannot reach 1 by
+construction invites adding labels instead of improving the heuristic.
+
+If resolution ever genuinely binds, add **targets** — never labels.
+
 ## Keeping labels honest
 
 Labels cannot be made immutable — anyone with write access can edit the file,

@@ -175,6 +175,16 @@ def _main_config(argv: list[str]) -> int:
     return 0
 
 
+# Subcommands that bypass the scan pipeline entirely. Registering a new one is
+# a single entry here plus its handler — previously it meant editing three
+# places in main().
+_SUBCOMMANDS = {
+    "scaffold": _main_scaffold,
+    "diff": _main_diff,
+    "config": _main_config,
+}
+
+
 def run(args: argparse.Namespace, provider: Provider) -> int:
     """Run the pipeline with an already-constructed provider. Returns exit code."""
     report = generate_docs(
@@ -202,12 +212,8 @@ def run(args: argparse.Namespace, provider: Provider) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if argv and argv[0] == "scaffold":
-        return _main_scaffold(argv[1:])
-    if argv and argv[0] == "diff":
-        return _main_diff(argv[1:])
-    if argv and argv[0] == "config":
-        return _main_config(argv[1:])
+    if argv and argv[0] in _SUBCOMMANDS:
+        return _SUBCOMMANDS[argv[0]](argv[1:])
 
     args = build_parser().parse_args(argv)
 

@@ -23,6 +23,7 @@ layer must be repeatable and verifiable.
 from __future__ import annotations
 
 import ast
+import logging
 import os
 
 from modscan.fsutil import walk_source_files
@@ -34,6 +35,8 @@ from modscan.models import (
     ImportInfo,
     ModuleInfo,
 )
+
+logger = logging.getLogger(__name__)
 
 # Runtime-import call patterns worth flagging as plugin-loading seams.
 # Keyed by the trailing attribute/name of the call.
@@ -197,6 +200,7 @@ def parse_file(path: str, root: str | None = None) -> ModuleInfo:
             tree = ast.parse(fh.read(), filename=path)
     except (SyntaxError, UnicodeDecodeError, OSError) as exc:
         module.parse_error = f"{type(exc).__name__}: {exc}"
+        logger.debug("could not parse %s: %s", path, module.parse_error)
         return module
     _ModuleVisitor(module).visit(tree)
     return module

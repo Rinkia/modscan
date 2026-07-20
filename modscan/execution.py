@@ -35,8 +35,11 @@ from __future__ import annotations
 
 import contextlib
 import importlib
+import logging
 import sys
 from typing import Any, Iterator
+
+logger = logging.getLogger(__name__)
 
 # Class kinds whose seams are validated by building/finding a concrete subclass.
 SUBCLASS_KINDS = ("class", "abstract_class")
@@ -115,6 +118,9 @@ def example_loads(root: str, code: str) -> bool:
     try:
         exec_example(root, code)
     except Exception:  # noqa: BLE001 — any failure means the example didn't load
+        # Swallowed on purpose (the caller only needs a verdict), but a failed
+        # example is exactly what you want to see when debugging a bad run.
+        logger.debug("example did not load under %s", root, exc_info=True)
         return False
     return True
 
@@ -131,6 +137,9 @@ def example_defines_working_subclass(
         base = load_symbol(root, module_qualname, symbol)
         namespace = exec_example(root, code)
     except Exception:  # noqa: BLE001
+        logger.debug(
+            "example for %s:%s did not load", module_qualname, symbol, exc_info=True
+        )
         return False
     if not isinstance(base, type):
         return False

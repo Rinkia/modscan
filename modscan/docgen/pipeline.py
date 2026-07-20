@@ -38,7 +38,7 @@ from modscan.detector import detect_extension_points
 from modscan.docgen import examples as ex
 from modscan.docgen import render
 from modscan.docgen.types import DocReport, GeneratedPoint
-from modscan.factblocks import build_fact_block, render_fact_block
+from modscan.factblocks import build_fact_block, build_module_index, render_fact_block
 from modscan.graph import build_graph
 from modscan.languages import get_language_parser
 from modscan.models import Codebase, ExampleStatus, ExtensionPoint
@@ -69,14 +69,17 @@ def _collect_facts(
     statically instead.
     """
     considered = points[:limit] if limit is not None else points
+    index = build_module_index(codebase)
     if not runtime_validated:
-        return [build_fact_block(codebase, p, _STATIC_METHOD) for p in considered]
+        return [
+            build_fact_block(codebase, p, _STATIC_METHOD, index) for p in considered
+        ]
 
     validations = validate_points(root, considered)
     # strict=True: a length mismatch here is a bug, not something to silently
     # truncate away (this used to rely on zip's implicit truncation).
     return [
-        build_fact_block(codebase, p, v.method)
+        build_fact_block(codebase, p, v.method, index)
         for p, v in zip(considered, validations, strict=True)
         if v.ok
     ]

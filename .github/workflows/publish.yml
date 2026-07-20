@@ -1,0 +1,76 @@
+name: Publish to PyPI
+
+# Publishing is a deliberate act: this runs only when a GitHub Release is
+# published, never on a plain push or tag.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to publish"
+        required: true
+        default: testpypi
+        type: choice
+        options: [testpypi, pypi]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+
+      - name: Check metadata renders on PyPI
+        run: python -m twine check --strict dist/*
+
+      - name: Verify the wheel installs and the CLI runs
+        run: |
+          python -m venv /tmp/verify
+          /tmp/verify/bin/python -m pip install dist/*.whl
+          /tmp/verify/bin/modscan --help > /dev/null
+          /tmp/verify/bin/python -c "import modscan; print('import OK', len(modscan.__all__), 'exports')"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    # Trusted Publishing (OIDC): no API token is stored anywhere. PyPI verifies
+    # the workflow identity directly. Configure the trusted publisher once in
+    # the PyPI project settings — see RELEASING.md.
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && inputs.target || 'pypi' }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to TestPyPI
+        if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish to PyPI
+        if: github.event_name != 'workflow_dispatch' || inputs.target == 'pypi'
+        uses: pypa/gh-action-pypi-publish@release/v1

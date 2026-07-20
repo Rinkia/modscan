@@ -79,7 +79,10 @@ parse/scan, and don't remove the warnings.
 2. Keep the diff focused; one concern per PR.
 3. Make the full self-check suite pass.
 4. Use clear commit messages (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`).
-5. Describe what changed and how you verified it.
+5. Add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md) for
+   anything user-visible (a new flag, changed behavior, a fix). Internal
+   refactors that nobody can observe do not need one.
+6. Describe what changed and how you verified it.
 
 ## License
 

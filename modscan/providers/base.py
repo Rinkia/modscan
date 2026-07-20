@@ -27,6 +27,11 @@ from typing import Callable, Protocol, runtime_checkable
 # Default model for the doc generator (layer 4). Anthropic's Opus 4.8.
 DEFAULT_MODEL = "claude-opus-4-8"
 
+# Cap on tokens generated per call. Applied by every adapter: previously only
+# the Anthropic one had a limit and the others were unbounded, so a runaway
+# response could cost far more than expected.
+DEFAULT_MAX_TOKENS = 4096
+
 # Provider names accepted by get_provider().
 _ANTHROPIC = "anthropic"
 _OPENAI_COMPAT = {"openai", "openai-compat", "openai_compat"}
@@ -74,6 +79,7 @@ def get_provider(
     model: str | None = None,
     api_key: str | None = None,
     base_url: str | None = None,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
 ) -> Provider:
     """Resolve a provider by name.
 
@@ -89,17 +95,24 @@ def get_provider(
     if key == _ANTHROPIC:
         from modscan.providers.anthropic import AnthropicProvider
 
-        return AnthropicProvider(model=model or DEFAULT_MODEL, api_key=api_key)
+        return AnthropicProvider(
+            model=model or DEFAULT_MODEL, api_key=api_key, max_tokens=max_tokens
+        )
     if key in _OPENAI_COMPAT:
         from modscan.providers.openai_compat import OpenAICompatProvider
 
         return OpenAICompatProvider(
-            model=model or DEFAULT_MODEL, api_key=api_key, base_url=base_url
+            model=model or DEFAULT_MODEL,
+            api_key=api_key,
+            base_url=base_url,
+            max_tokens=max_tokens,
         )
     if key == _GEMINI:
         from modscan.providers.gemini import GeminiProvider
 
-        return GeminiProvider(model=model or _GEMINI_DEFAULT_MODEL, api_key=api_key)
+        return GeminiProvider(
+            model=model or _GEMINI_DEFAULT_MODEL, api_key=api_key, max_tokens=max_tokens
+        )
     raise ValueError(
         f"unknown provider {name!r}; expected 'anthropic', 'openai', or 'gemini'"
     )

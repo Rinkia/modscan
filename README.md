@@ -13,8 +13,11 @@ analysis. It doesn't just describe the code (Doxygen already does that); it maps
 the **seams** a modder actually hooks into, then writes a "how to build a plugin"
 guide and a **working example plugin that it validates by loading it for real**.
 
-> Status: **MVP core complete.** All five analysis layers work (parse → graph →
-> detect → validate → generate). The CLI wrapper is the next step.
+> Status: **v0.1.0 (pre-release).** The full pipeline works end to end for
+> Python, with experimental TypeScript/JavaScript support. The extension-point
+> *ranking* is the rough edge — on large codebases it surfaces plausible but
+> low-value seams. See the [open issues](https://github.com/Rinkia/modscan/issues)
+> if you want to help sharpen it.
 
 ---
 
@@ -110,7 +113,9 @@ ones that can't be validated are clearly marked `unverified`.
 4. ✅ Doc generator (LLM, grounded) — Markdown + JSON manifest
 5. ✅ `modscan ./path` CLI wrapper, end to end
 6. ✅ `modscan scaffold <id>` — generate a plugin skeleton from the JSON manifest
-7. Later: more languages (JS/TS), web UI, and — only with proper legal
+7. ✅ TypeScript/JavaScript front-end (experimental), breaking-change diffs,
+   sandboxed validation, spend controls
+8. Next: sharper ranking heuristics, a web UI, and — only with proper legal
    guardrails — the binary case
 
 ## Usage
@@ -133,6 +138,8 @@ modscan ./proj --language typescript     # scan a TS/JS codebase (static docs)
 modscan ./proj --no-validate-examples   # skip importing/executing target code
 modscan ./proj --sandbox                 # validate examples in an isolated subprocess
 modscan ./proj --cache-dir .modscan-cache  # cache LLM responses for cheap re-runs
+modscan ./proj --max-tokens 2048 --max-calls 50   # spend controls: per-call cap + hard run ceiling
+modscan ./proj --concurrency 8           # parallel LLM calls (the main speed-up)
 ```
 
 Then scaffold a ready-to-edit plugin from any documented extension point (no LLM,

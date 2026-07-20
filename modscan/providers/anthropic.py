@@ -23,12 +23,18 @@ from __future__ import annotations
 
 import os
 
-_MAX_TOKENS = 4096
+from modscan.providers.base import DEFAULT_MAX_TOKENS
 
 
 class AnthropicProvider:
-    def __init__(self, model: str, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        model: str,
+        api_key: str | None = None,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+    ) -> None:
         self.model = model
+        self.max_tokens = max_tokens
         self._api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
 
     def generate(self, system: str, prompt: str) -> str:
@@ -43,7 +49,7 @@ class AnthropicProvider:
         client = anthropic.Anthropic(api_key=self._api_key)
         response = client.messages.create(
             model=self.model,
-            max_tokens=_MAX_TOKENS,
+            max_tokens=self.max_tokens,
             system=system,
             messages=[{"role": "user", "content": prompt}],
         )

@@ -14,6 +14,13 @@
 
 """MODScan — scan a codebase, generate plugin/mod documentation."""
 
+import logging as _logging
+
+# Library convention: attach a NullHandler so importing modscan never configures
+# logging or prints to stderr on its own. Applications (and the CLI) opt in by
+# configuring handlers themselves.
+_logging.getLogger(__name__).addHandler(_logging.NullHandler())
+
 from modscan.models import (
     Codebase,
     ModuleInfo,

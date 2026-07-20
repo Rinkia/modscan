@@ -57,6 +57,12 @@ def _is_abstract_method(fn: FunctionInfo) -> bool:
     return any("abstractmethod" in d for d in fn.decorators)
 
 
+def build_module_index(codebase: Codebase) -> dict[str, ModuleInfo]:
+    """Map qualname -> module once, so callers building many fact blocks do not
+    re-scan the whole module list for each one (was O(points x modules))."""
+    return {m.qualname: m for m in codebase.modules}
+
+
 def _find_module(codebase: Codebase, qualname: str) -> ModuleInfo | None:
     for module in codebase.modules:
         if module.qualname == qualname:
@@ -74,7 +80,10 @@ def _class_facts(cls: ClassInfo) -> tuple[str, tuple[str, ...]]:
 
 
 def build_fact_block(
-    codebase: Codebase, point: ExtensionPoint, validation_method: str = ""
+    codebase: Codebase,
+    point: ExtensionPoint,
+    validation_method: str = "",
+    module_index: dict[str, ModuleInfo] | None = None,
 ) -> FactBlock:
     """Join an extension point back to the rich parser model into a FactBlock.
 
@@ -82,7 +91,11 @@ def build_fact_block(
     dynamic-import site, which is a call, not a named definition).
     """
     seam = point.seam
-    module = _find_module(codebase, seam.module)
+    module = (
+        module_index.get(seam.module)
+        if module_index is not None
+        else _find_module(codebase, seam.module)
+    )
 
     signature = ""
     bases: tuple[str, ...] = ()

@@ -33,13 +33,13 @@ from __future__ import annotations
 
 import os
 
+from modscan.fsutil import walk_source_files
 from modscan.languages.base import register_language
 from modscan.models import ClassInfo, Codebase, FunctionInfo, ImportInfo, ModuleInfo
 
 _TS_EXTS = (".ts", ".mts", ".cts", ".js", ".mjs", ".cjs")
 _TSX_EXTS = (".tsx", ".jsx")
 _ALL_EXTS = _TS_EXTS + _TSX_EXTS
-_SKIP_DIRS = {".git", "node_modules", "dist", "build", ".next", "__pycache__"}
 
 
 def _load_parsers():
@@ -203,16 +203,10 @@ class TypeScriptLanguageParser:
         ts_parser, tsx_parser = _load_parsers()
         root = os.path.abspath(root)
         codebase = Codebase(root=root)
-        for dirpath, dirnames, filenames in os.walk(root):
-            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
-            for fn in filenames:
-                ext = os.path.splitext(fn)[1]
-                if ext not in _ALL_EXTS:
-                    continue
-                parser = tsx_parser if ext in _TSX_EXTS else ts_parser
-                codebase.modules.append(
-                    _parse_file(os.path.join(dirpath, fn), root, parser)
-                )
+        for path in walk_source_files(root, _ALL_EXTS):
+            ext = os.path.splitext(path)[1]
+            parser = tsx_parser if ext in _TSX_EXTS else ts_parser
+            codebase.modules.append(_parse_file(path, root, parser))
         codebase.modules.sort(key=lambda m: m.qualname)
         return codebase
 

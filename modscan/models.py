@@ -22,6 +22,27 @@ a deterministic fact extracted from the AST — no inference, no LLM.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
+
+
+class ExampleStatus(str, Enum):
+    """How much confidence we have in a generated example plugin.
+
+    A `str` subclass on purpose: every existing comparison against the bare
+    strings and the JSON manifest keep working byte-for-byte, while the set of
+    valid values now lives in exactly one place instead of being re-spelled
+    across the generator, the manifest and both renderers.
+    """
+
+    VERIFIED = "verified"      # subclass example executed and instantiated
+    EXECUTED = "executed"      # non-subclass example loaded cleanly
+    COMPILED = "compiled"      # syntactically valid only (validation disabled)
+    GENERATED = "generated"    # written by the LLM, not executed (non-Python)
+    INVALID = "invalid"        # attempt failed; triggers a retry
+    UNVERIFIED = "unverified"  # nothing held after all retries
+
+    def __str__(self) -> str:  # keep f-strings/printing on the bare value
+        return self.value
 
 
 @dataclass(frozen=True)
@@ -112,3 +133,34 @@ class Codebase:
     @property
     def failed_modules(self) -> list[ModuleInfo]:
         return [m for m in self.modules if m.parse_error is not None]
+
+
+@dataclass(frozen=True)
+class Seam:
+    """A single candidate extension point, flattened across the codebase.
+
+    Produced by the extension graph (layer 2), scored by the detector (layer 3).
+    Lives here rather than in either of those modules because it is the shared
+    vocabulary they and every downstream layer speak.
+    """
+
+    kind: str  # "function" | "class" | "abstract_class" | "dynamic_import"
+    module: str  # owning module qualname
+    name: str  # symbol name (or dynamic-import kind)
+    lineno: int
+    detail: str = ""  # bases for classes, decorators, dynamic arg, etc.
+
+
+@dataclass(frozen=True)
+class ExtensionPoint:
+    """A scored, categorised Seam — the detector's output and the unit that the
+    validator, fact blocks, docs and manifest all key off."""
+
+    seam: Seam
+    category: str  # "plugin_loader" | "subclass" | "hook" | "registration" | "api"
+    score: float  # 0..1 moddability
+    signals: tuple[str, ...]  # human-readable reasons behind the score
+
+    @property
+    def location(self) -> str:
+        return f"{self.seam.module}:{self.seam.lineno}"

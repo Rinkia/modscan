@@ -26,9 +26,8 @@ and layer 5 (validator) is what ultimately confirms a seam is real.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from modscan.graph import ExtensionGraph, Seam
+from modscan.graph import ExtensionGraph
+from modscan.models import ExtensionPoint, Seam
 
 # --- signal weights (0..1 contributions, summed then clamped) ---------------
 _W_DYNAMIC_IMPORT = 0.9  # runtime import = plugin loader, strongest single signal
@@ -58,18 +57,6 @@ _REGISTRATION_DECORATOR_PARTS = (
 )
 
 _SCORE_MAX = 1.0
-
-
-@dataclass(frozen=True)
-class ExtensionPoint:
-    seam: Seam
-    category: str  # "plugin_loader" | "subclass" | "hook" | "registration" | "api"
-    score: float  # 0..1 moddability
-    signals: tuple[str, ...]  # human-readable reasons behind the score
-
-    @property
-    def location(self) -> str:
-        return f"{self.seam.module}:{self.seam.lineno}"
 
 
 def _name_hook_part(name: str) -> str | None:

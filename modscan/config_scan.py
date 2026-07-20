@@ -30,7 +30,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-_SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", "node_modules", "dist", "build"}
+from modscan.fsutil import SKIP_DIRS
 
 # File stems that read like a plugin/mod manifest or registry.
 _CONFIG_STEMS = {
@@ -54,7 +54,7 @@ def find_config_points(root: str) -> list[ConfigPoint]:
     root = os.path.abspath(root)
     points: list[ConfigPoint] = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
 
         for d in dirnames:
             if d.lower() in _DATA_DIRS:

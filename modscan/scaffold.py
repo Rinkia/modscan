@@ -25,6 +25,8 @@ from __future__ import annotations
 import json
 import os
 
+from modscan.fsutil import slugify
+
 
 def load_manifest(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as fh:
@@ -96,13 +98,9 @@ def render_scaffold(point: dict) -> str:
     return _render_template(point)
 
 
-def _safe(point_id: str) -> str:
-    return "".join(c if c.isalnum() else "_" for c in point_id)
-
-
 def _write_point(point: dict, out_dir: str) -> str:
     os.makedirs(out_dir, exist_ok=True)
-    path = os.path.join(out_dir, f"{_safe(point['id'])}_plugin.py")
+    path = os.path.join(out_dir, f"{slugify(point['id'])}_plugin.py")
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(render_scaffold(point))
     return path

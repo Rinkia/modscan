@@ -75,9 +75,34 @@ def test_sandbox_kills_hang_on_timeout() -> None:
     )
 
 
+def test_host_and_sandbox_agree() -> None:
+    """The in-process and sandboxed paths must return the same verdict.
+
+    They now share one implementation (modscan.execution.validate_example) —
+    the sandbox child imports it rather than carrying a copy. This test could
+    not be written while the logic was duplicated in a string literal.
+    """
+    from modscan.execution import validate_example
+
+    root = _make_pkg()
+    cases = [
+        # (code, kind) -> both paths must agree
+        ("from sbx.api import Sink\nclass S(Sink):\n    def write(self, i):\n        return i\n", "abstract_class"),
+        ("x = 1\n", "abstract_class"),                       # no subclass
+        ("import definitely_not_real_xyz\n", "abstract_class"),  # bad import
+        ("from sbx.api import Sink\n", "function"),          # non-class seam, loads
+        ("import definitely_not_real_xyz\n", "function"),    # non-class seam, fails
+    ]
+    for code, kind in cases:
+        host = validate_example(root, "sbx.api", "Sink", code, kind)
+        child = validate_in_sandbox(root, "sbx.api", "Sink", code, kind)
+        assert host == child, (kind, code, host, child)
+
+
 if __name__ == "__main__":
     test_sandbox_accepts_valid_subclass()
     test_sandbox_rejects_non_subclass()
     test_sandbox_rejects_bad_import()
     test_sandbox_kills_hang_on_timeout()
+    test_host_and_sandbox_agree()
     print("OK: sandbox self-check passed")

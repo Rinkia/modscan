@@ -14,11 +14,16 @@
 
 """Subprocess sandbox for example validation.
 
-In-process validation (docgen/validator) executes target and generated code in
-the host interpreter — fine for code you trust. When the target is less trusted,
-`validate_in_sandbox` runs the same check in a short-lived child process with a
-timeout, so a hang or crash can't take down the host and the blast radius is one
-disposable process.
+In-process validation (execution.py) runs target and generated code in the host
+interpreter — fine for code you trust. When the target is less trusted,
+`validate_in_sandbox` performs the *same* check in a short-lived child process
+with a timeout, so a hang or crash can't take down the host and the blast radius
+is one disposable process.
+
+The child does not carry its own copy of the validation logic: it imports
+`modscan.execution.validate_example`, the same function the in-process path
+calls. Host and sandbox therefore cannot drift apart — a fix to the loading
+logic lands in both at once.
 
 ponytail: a subprocess with a timeout — not a real security boundary (no seccomp,
 namespaces, or resource caps). It contains hangs and crashes, not malice. A true
@@ -29,38 +34,34 @@ step and enough for "I mostly trust this, but don't want a runaway import."
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 
 _DEFAULT_TIMEOUT = 10
 
-# Runs in the child. Reads a JSON job from stdin, exits 0 if the example loaded
-# (and, for a class seam, a concrete subclass instantiated), else non-zero.
+# Runs in the child: read a job from stdin, delegate to the shared validator,
+# report via exit code. Deliberately trivial — all real logic lives in
+# modscan.execution so there is exactly one implementation.
 _RUNNER = r"""
-import importlib, json, sys
+import json, sys
 
 job = json.loads(sys.stdin.read())
-sys.path.insert(0, job["root"])
+sys.path.insert(0, job["package_path"])
 try:
-    namespace = {}
-    exec(compile(job["code"], "<sandbox-example>", "exec"), namespace)
-    if job["kind"] in ("class", "abstract_class"):
-        base = getattr(importlib.import_module(job["module"]), job["symbol"])
-        if not isinstance(base, type):
-            sys.exit(1)
-        for value in namespace.values():
-            if isinstance(value, type) and value is not base:
-                try:
-                    if issubclass(value, base):
-                        value()
-                        sys.exit(0)
-                except Exception:
-                    pass
-        sys.exit(1)
-    sys.exit(0)  # non-class seam: loading clean is enough
+    from modscan.execution import validate_example
+    ok = validate_example(
+        job["root"], job["module"], job["symbol"], job["code"], job["kind"]
+    )
 except Exception:
-    sys.exit(1)
+    ok = False
+sys.exit(0 if ok else 1)
 """
+
+
+def _package_path() -> str:
+    """Directory containing the `modscan` package, so the child can import it."""
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def validate_in_sandbox(
@@ -73,7 +74,14 @@ def validate_in_sandbox(
 ) -> bool:
     """Validate an example in a child process. True if it loaded/instantiated."""
     job = json.dumps(
-        {"root": root, "module": module, "symbol": symbol, "code": code, "kind": kind}
+        {
+            "root": root,
+            "module": module,
+            "symbol": symbol,
+            "code": code,
+            "kind": kind,
+            "package_path": _package_path(),
+        }
     )
     try:
         proc = subprocess.run(

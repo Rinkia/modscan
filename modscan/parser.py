@@ -25,6 +25,7 @@ from __future__ import annotations
 import ast
 import os
 
+from modscan.fsutil import walk_source_files
 from modscan.models import (
     ClassInfo,
     Codebase,
@@ -201,17 +202,11 @@ def parse_file(path: str, root: str | None = None) -> ModuleInfo:
     return module
 
 
-_SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".mypy_cache", ".ruff_cache", "node_modules"}
-
-
 def parse_codebase(root: str) -> Codebase:
     """Recursively parse every .py file under `root`."""
     root = os.path.abspath(root)
     codebase = Codebase(root=root)
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
-        for fn in filenames:
-            if fn.endswith(".py"):
-                codebase.modules.append(parse_file(os.path.join(dirpath, fn), root))
+    for path in walk_source_files(root, (".py",)):
+        codebase.modules.append(parse_file(path, root))
     codebase.modules.sort(key=lambda m: m.qualname)
     return codebase

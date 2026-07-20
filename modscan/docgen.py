@@ -33,19 +33,20 @@ is the upgrade path for untrusted targets; out of scope for the MVP.
 
 from __future__ import annotations
 
-import contextlib
-import importlib
 import os
-import sys
 from dataclasses import dataclass, field
-from typing import Iterator
 
 from modscan.detector import detect_extension_points
+from modscan.execution import (
+    SUBCLASS_KINDS,
+    example_defines_working_subclass,
+    example_loads,
+)
 from modscan.factblocks import FactBlock, build_fact_block, render_fact_block
+from modscan.fsutil import slugify
 from modscan.graph import build_graph
 from modscan.languages import get_language_parser
 from modscan.manifest import build_manifest, write_manifest
-from modscan.parser import parse_codebase
 from modscan.prompts import SYSTEM, architecture_prompt, example_prompt, guide_prompt
 from modscan.providers.base import Provider
 from modscan.sandbox import validate_in_sandbox
@@ -84,16 +85,6 @@ class DocReport:
         return sum(1 for p in self.points if p.example_status == "verified")
 
 
-@contextlib.contextmanager
-def _sys_path(entry: str) -> Iterator[None]:
-    sys.path.insert(0, entry)
-    try:
-        yield
-    finally:
-        with contextlib.suppress(ValueError):
-            sys.path.remove(entry)
-
-
 def _extract_code(raw: str) -> str:
     """Pull the body out of a ```python ...``` fence, else return as-is."""
     text = raw.strip()
@@ -108,46 +99,14 @@ def _extract_code(raw: str) -> str:
     return "\n".join(lines).strip()
 
 
-def _exec_and_instantiate(root: str, fb: FactBlock, code: str) -> bool:
-    """Exec the example, find a concrete subclass of the seam, instantiate it."""
-    try:
-        with _sys_path(root):
-            base = getattr(importlib.import_module(fb.module), fb.symbol)
-            namespace: dict = {}
-            exec(compile(code, "<modscan-example>", "exec"), namespace)  # noqa: S102
-    except Exception:  # noqa: BLE001 — any failure means the example didn't load
-        return False
-    if not isinstance(base, type):
-        return False
-    try:
-        for value in namespace.values():
-            # issubclass can raise on some bases (e.g. a typing.Protocol with
-            # data members), so guard the whole search.
-            if isinstance(value, type) and value is not base and issubclass(value, base):
-                value()
-                return True
-    except Exception:  # noqa: BLE001 — any failure means the example didn't load
-        return False
-    return False
-
-
-def _exec_module(root: str, code: str) -> bool:
-    """Exec the example so imports resolve and module-level code runs clean."""
-    try:
-        with _sys_path(root):
-            exec(compile(code, "<modscan-example>", "exec"), {})  # noqa: S102
-    except Exception:  # noqa: BLE001 — any failure means the example didn't load
-        return False
-    return True
-
-
 def _verify_example(
     root: str, fb: FactBlock, code: str, validate: bool, sandbox: bool
 ) -> str:
     """Return an example status: verified | executed | compiled | invalid.
 
-    When `sandbox` is set, example execution runs in an isolated child process
-    (see sandbox.py) instead of the host interpreter.
+    Loading/execution is delegated to `execution.py` (or, with `sandbox` set, to
+    a child process running that same code) so the in-process and sandboxed
+    paths can never disagree.
     """
     try:
         compile(code, "<modscan-example>", "exec")
@@ -155,19 +114,20 @@ def _verify_example(
         return "invalid"
     if not validate:
         return "compiled"
-    if fb.kind in ("class", "abstract_class"):
-        if sandbox:
-            ok = validate_in_sandbox(root, fb.module, fb.symbol, code, fb.kind)
-        else:
-            ok = _exec_and_instantiate(root, fb, code)
-        return "verified" if ok else "invalid"
-    # hook/registration/api: no subclass to instantiate, but we can still load
-    # the example to catch bad imports and module-level errors.
+
+    is_subclass_seam = fb.kind in SUBCLASS_KINDS
     if sandbox:
         ok = validate_in_sandbox(root, fb.module, fb.symbol, code, fb.kind)
+    elif is_subclass_seam:
+        ok = example_defines_working_subclass(root, fb.module, fb.symbol, code)
     else:
-        ok = _exec_module(root, code)
-    return "executed" if ok else "invalid"
+        # hook/registration/api: no subclass to instantiate, but we can still
+        # load the example to catch bad imports and module-level errors.
+        ok = example_loads(root, code)
+
+    if not ok:
+        return "invalid"
+    return "verified" if is_subclass_seam else "executed"
 
 
 def _make_example(
@@ -194,8 +154,7 @@ def _dependency_summary(dependencies: dict[str, set[str]]) -> str:
 
 
 def _example_filename(point_id: str, ext: str) -> str:
-    safe = "".join(c if c.isalnum() else "_" for c in point_id)
-    return f"{safe}{ext}"
+    return f"{slugify(point_id)}{ext}"
 
 
 _LANGUAGE_EXT = {"python": ".py", "javascript": ".js", "typescript": ".ts"}

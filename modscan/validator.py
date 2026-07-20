@@ -20,26 +20,30 @@ into it. This layer takes an ExtensionPoint, builds a minimal probe plugin
 the probe loads — instantiates, or is importable and callable. If it does, the
 seam is real and the docs generated for it (layer 4) can be trusted.
 
+All code loading/execution is delegated to `execution.py`, which is the single
+implementation shared with the doc generator and the sandbox child.
+
 SECURITY / TRUST BOUNDARY
 -------------------------
 Validation IMPORTS the target codebase, which executes its module-level code.
 Only run it on code you trust. It is a deliberate, explicit call — never invoked
 automatically by parsing/scanning. Do not point it at untrusted third-party
 source.
-ponytail: in-process import, no sandbox. A subprocess/sandbox is the upgrade
-path if MODScan ever validates untrusted code; out of scope for the MVP, which
-targets source the operator already trusts.
+ponytail: in-process import, no sandbox. `sandbox.py` is the containment upgrade
+path for less-trusted targets; out of scope for the MVP, which targets source
+the operator already trusts.
 """
 
 from __future__ import annotations
 
-import contextlib
-import importlib
-import sys
 from dataclasses import dataclass
-from typing import Iterator
 
 from modscan.detector import ExtensionPoint
+from modscan.execution import (
+    SUBCLASS_KINDS,
+    instantiate_probe_subclass,
+    load_symbol,
+)
 
 
 @dataclass(frozen=True)
@@ -54,58 +58,20 @@ class ValidationResult:
         return self.point.location
 
 
-@contextlib.contextmanager
-def _sys_path(entry: str) -> Iterator[None]:
-    """Temporarily prepend `entry` to sys.path so target modules import."""
-    sys.path.insert(0, entry)
-    try:
-        yield
-    finally:
-        with contextlib.suppress(ValueError):
-            sys.path.remove(entry)
-
-
-def _load_symbol(root: str, module_qualname: str, name: str):
-    """Import the target module and return the named attribute.
-
-    Raises on import failure or missing attribute; callers translate that into a
-    failed ValidationResult rather than letting it propagate.
-    """
-    with _sys_path(root):
-        module = importlib.import_module(module_qualname)
-    return getattr(module, name)
-
-
 def _validate_subclass(root: str, point: ExtensionPoint) -> ValidationResult:
     """Build a concrete subclass implementing all abstract methods, instantiate it."""
     try:
-        cls = _load_symbol(root, point.seam.module, point.seam.name)
+        cls = load_symbol(root, point.seam.module, point.seam.name)
     except Exception as exc:  # noqa: BLE001 — import of target can fail many ways
         return ValidationResult(point, False, "error", f"import failed: {exc!r}")
 
     if not isinstance(cls, type):
         return ValidationResult(point, False, "error", f"{point.seam.name} is not a class")
 
-    abstract = getattr(cls, "__abstractmethods__", frozenset())
-    # Stub out every abstract method so the subclass is concrete.
-    namespace = {m: (lambda self, *a, **k: None) for m in abstract}
-
-    try:
-        # Subclass creation itself can raise (e.g. typing.Protocol with data
-        # members rejects issubclass), so it must be inside the guard too.
-        probe = type(f"_ModScanProbe_{cls.__name__}", (cls,), namespace)
-        probe()  # raises TypeError if still abstract, or if __init__ needs args
-    except Exception as exc:  # noqa: BLE001
-        return ValidationResult(
-            point, False, "error", f"subclass did not instantiate: {exc!r}"
-        )
-    return ValidationResult(
-        point,
-        True,
-        "subclass_instantiation",
-        f"probe subclass of {point.seam.name} instantiated"
-        + (f" (stubbed {len(abstract)} abstract method(s))" if abstract else ""),
-    )
+    ok, detail = instantiate_probe_subclass(cls)
+    if not ok:
+        return ValidationResult(point, False, "error", detail)
+    return ValidationResult(point, True, "subclass_instantiation", detail)
 
 
 def _validate_importable(root: str, point: ExtensionPoint) -> ValidationResult:
@@ -115,7 +81,7 @@ def _validate_importable(root: str, point: ExtensionPoint) -> ValidationResult:
     that invoking it works (that needs real arguments the tool can't invent).
     """
     try:
-        obj = _load_symbol(root, point.seam.module, point.seam.name)
+        obj = load_symbol(root, point.seam.module, point.seam.name)
     except Exception as exc:  # noqa: BLE001
         return ValidationResult(point, False, "error", f"import failed: {exc!r}")
 
@@ -155,3 +121,11 @@ def validate_points(
     """
     chosen = points[:limit] if limit is not None else points
     return [validate_point(root, p) for p in chosen]
+
+
+__all__ = [
+    "ValidationResult",
+    "validate_point",
+    "validate_points",
+    "SUBCLASS_KINDS",
+]

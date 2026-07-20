@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "labelling_rule": "A symbol is a real extension point when the package's own documentation presents it as something a user implements, subclasses, or registers against - not merely calls. Deliberately independent of public-export status, which is the candidate signal under test. See benchmarks/README.md.",
+  "targets": {
+    "pluggy": {
+      "version": "1.6.0",
+      "docs": "https://pluggy.readthedocs.io/",
+      "note": "Defines its public API inside underscore-prefixed modules and re-exports from __init__. Any heuristic penalising private module paths must be measured here first.",
+      "extension_points": [
+        {
+          "id": "pluggy._manager:PluginManager",
+          "justification": "Docs 'Plugin management': users instantiate PluginManager and register their plugin objects against it. It is the entry point of the whole plugin lifecycle."
+        },
+        {
+          "id": "pluggy._hooks:HookspecMarker",
+          "justification": "Docs 'Specs': a host application defines its hook specifications by decorating functions with a HookspecMarker instance."
+        },
+        {
+          "id": "pluggy._hooks:HookimplMarker",
+          "justification": "Docs 'Impls': a plugin author marks hook implementations with a HookimplMarker instance. This is how a pluggy plugin is written."
+        }
+      ]
+    },
+    "click": {
+      "version": "8.4.2",
+      "docs": "https://click.palletsprojects.com/",
+      "extension_points": [
+        {
+          "id": "click.types:ParamType",
+          "justification": "Docs 'Implementing Custom Types': the documented way to add a parameter type is to subclass ParamType and implement convert()."
+        },
+        {
+          "id": "click.core:Command",
+          "justification": "Docs 'Custom Commands': a custom command class is supplied via the cls= argument to the command decorator."
+        },
+        {
+          "id": "click.core:Group",
+          "justification": "Docs 'Custom Groups' / lazy command loading: subclassing Group is the documented way to control how subcommands are discovered and loaded."
+        },
+        {
+          "id": "click.core:Parameter",
+          "justification": "Docs 'Parameters': custom parameter behaviour is documented via cls= on option/argument decorators, pointing at Parameter subclasses."
+        }
+      ]
+    },
+    "sqlalchemy": {
+      "version": "2.0.51",
+      "docs": "https://docs.sqlalchemy.org/",
+      "note": "Deliberately partial. SQLAlchemy documents more seams than are labelled here; recall against a partial list is still a valid regression signal.",
+      "extension_points": [
+        {
+          "id": "sqlalchemy.sql.type_api:TypeDecorator",
+          "justification": "Docs 'Augmenting Existing Types': TypeDecorator is the documented base class for wrapping an existing type with custom bind/result processing."
+        },
+        {
+          "id": "sqlalchemy.sql.type_api:UserDefinedType",
+          "justification": "Docs 'Creating New Types': UserDefinedType is the documented base for defining an entirely new database type."
+        },
+        {
+          "id": "sqlalchemy.sql.functions:FunctionElement",
+          "justification": "Docs 'Defining Custom SQL Constructs': user-defined SQL functions are created by subclassing FunctionElement (commonly via GenericFunction) and registering a compiler."
+        },
+        {
+          "id": "sqlalchemy.engine.interfaces:Dialect",
+          "justification": "Docs 'Developing new Dialects': third-party database drivers integrate with SQLAlchemy by implementing the Dialect interface."
+        },
+        {
+          "id": "sqlalchemy.sql.ddl:ExecutableDDLElement",
+          "justification": "Docs 'Custom DDL': custom DDL constructs are defined by subclassing ExecutableDDLElement and attaching a compiler."
+        }
+      ]
+    }
+  }
+}

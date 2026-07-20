@@ -1,0 +1,4 @@
+# Benchmark ground truth decides whether every future ranking change counts as
+# an improvement. Changes here need a review of the evidence, not just the diff.
+/benchmarks/ @Rinkia
+/tests/test_benchmark_labels.py @Rinkia

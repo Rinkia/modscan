@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-07-20
+
+Everything since the MVP: more languages, more surfaces, safer execution, and a
+substantial internal cleanup.
+
 ### Added
 
 - **TypeScript/JavaScript front-end** (experimental, via tree-sitter). Parses
@@ -115,5 +122,6 @@ Initial MVP: the full pipeline, end to end.
   skeletons from the manifest.
 - Apache-2.0 licensing.
 
-> No git tags exist yet, so there are no release-comparison links. They will be
-> added when the first version is tagged.
+[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Rinkia/modscan/compare/v0.0.1...v0.1.0
+[0.0.1]: https://github.com/Rinkia/modscan/releases/tag/v0.0.1

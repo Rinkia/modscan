@@ -218,8 +218,96 @@ def test_docgen_executed_status_for_registration() -> None:
     print("OK: docgen executed-status self-check passed")
 
 
+MULTI_SRC = (
+    "from abc import ABC, abstractmethod\n"
+    "\n"
+    "__all__ = ['Alpha', 'Beta', 'Gamma', 'register']\n"
+    "\n"
+    "class Alpha(ABC):\n"
+    "    @abstractmethod\n"
+    "    def run(self): ...\n"
+    "\n"
+    "class Beta(ABC):\n"
+    "    @abstractmethod\n"
+    "    def run(self): ...\n"
+    "\n"
+    "class Gamma(ABC):\n"
+    "    @abstractmethod\n"
+    "    def run(self): ...\n"
+    "\n"
+    "def register(fn):\n"
+    "    return fn\n"
+)
+
+
+def _read_tree(root: str) -> dict[str, bytes]:
+    """Every file under `root` as raw bytes — this is a byte-identity check."""
+    out = {}
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d != "__pycache__"]
+        for fn in sorted(files):
+            p = os.path.join(dirpath, fn)
+            with open(p, "rb") as fh:
+                out[os.path.relpath(p, root).replace(os.sep, "/")] = fh.read()
+    return out
+
+
+def test_concurrency_does_not_change_output() -> None:
+    """Fanning the LLM calls across threads must not alter a single byte.
+
+    Results are collected in input order and in-process validation is
+    serialised behind a lock, so concurrency is purely a wall-clock change.
+    """
+    pkg = "dgconc"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        open(os.path.join(d, "__init__.py"), "w").close()
+        with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write(MULTI_SRC)
+        try:
+
+            def responder(system: str, prompt: str) -> str:
+                if "EXAMPLE plugin" in prompt:
+                    for name in ("Alpha", "Beta", "Gamma"):
+                        if f"symbol: {name}" in prompt:
+                            return (
+                                f"```python\nfrom {pkg}.api import {name}\n"
+                                f"class My{name}({name}):\n"
+                                "    def run(self):\n"
+                                "        return 1\n```"
+                            )
+                    return "```python\nfrom dgconc.api import register\n@register\ndef h():\n    return 1\n```"
+                return "prose"
+
+            # Output must live OUTSIDE the scanned tree: otherwise the second
+            # run scans the examples the first run generated.
+            with tempfile.TemporaryDirectory() as outs:
+                serial_out = os.path.join(outs, "serial")
+                generate_docs(root, FakeProvider(responder), serial_out, min_score=0.4)
+                parallel_out = os.path.join(outs, "parallel")
+                generate_docs(
+                    root,
+                    FakeProvider(responder),
+                    parallel_out,
+                    min_score=0.4,
+                    concurrency=8,
+                )
+                serial, parallel = _read_tree(serial_out), _read_tree(parallel_out)
+
+            assert set(serial) == set(parallel), (set(serial) ^ set(parallel))
+            for name in serial:
+                assert serial[name] == parallel[name], f"differs: {name}"
+            assert len(serial) > 3, "fixture should produce several artifacts"
+        finally:
+            _cleanup(pkg)
+
+    print("OK: docgen concurrency-invariance self-check passed")
+
+
 if __name__ == "__main__":
     test_docgen_verified()
     test_docgen_unverified_retries()
     test_docgen_protocol_seam_does_not_crash()
     test_docgen_executed_status_for_registration()
+    test_concurrency_does_not_change_output()

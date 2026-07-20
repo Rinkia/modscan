@@ -21,6 +21,9 @@ work?" rules live in one readable place. All code execution is delegated to
 
 from __future__ import annotations
 
+import contextlib
+import threading
+
 from modscan.execution import (
     SUBCLASS_KINDS,
     example_defines_working_subclass,
@@ -66,13 +69,24 @@ def extract_code(raw: str) -> str:
 
 
 def verify_example(
-    root: str, fb: FactBlock, code: str, validate: bool, sandbox: bool
+    root: str,
+    fb: FactBlock,
+    code: str,
+    validate: bool,
+    sandbox: bool,
+    lock: threading.Lock | None = None,
 ) -> ExampleStatus:
     """Return an example status: verified | executed | compiled | invalid.
 
     Loading/execution is delegated to `execution.py` (or, with `sandbox` set, to
     a child process running that same code) so the in-process and sandboxed
     paths can never disagree.
+
+    `lock` serialises IN-PROCESS validation. Importing a target mutates
+    process-global state (sys.path, sys.modules) and exec's into it, so it is
+    not thread-safe; callers running points concurrently must pass a shared
+    lock. Sandboxed validation needs no lock — the child process has its own
+    interpreter state.
     """
     try:
         compile(code, "<modscan-example>", "exec")
@@ -83,13 +97,17 @@ def verify_example(
 
     is_subclass_seam = fb.kind in SUBCLASS_KINDS
     if sandbox:
+        # Child process: isolated interpreter state, safe to run unserialised.
         ok = validate_in_sandbox(root, fb.module, fb.symbol, code, fb.kind)
-    elif is_subclass_seam:
-        ok = example_defines_working_subclass(root, fb.module, fb.symbol, code)
     else:
-        # hook/registration/api: no subclass to instantiate, but we can still
-        # load the example to catch bad imports and module-level errors.
-        ok = example_loads(root, code)
+        guard = lock if lock is not None else contextlib.nullcontext()
+        with guard:
+            if is_subclass_seam:
+                ok = example_defines_working_subclass(root, fb.module, fb.symbol, code)
+            else:
+                # hook/registration/api: no subclass to instantiate, but we can
+                # still load it to catch bad imports and module-level errors.
+                ok = example_loads(root, code)
 
     if not ok:
         return ExampleStatus.INVALID
@@ -103,12 +121,13 @@ def make_example(
     retries: int,
     validate: bool,
     sandbox: bool,
+    lock: threading.Lock | None = None,
 ) -> tuple[str, ExampleStatus]:
     """Generate and validate an example plugin, retrying up to `retries` times."""
     code = ""
     for _ in range(retries):
         code = extract_code(provider.generate(SYSTEM, example_prompt(fb)))
-        status = verify_example(root, fb, code, validate, sandbox)
+        status = verify_example(root, fb, code, validate, sandbox, lock)
         if status in OK_STATUSES:
             return code, status
     return code, ExampleStatus.UNVERIFIED

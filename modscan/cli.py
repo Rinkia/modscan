@@ -78,6 +78,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="validate examples in an isolated subprocess (safer for less-trusted code)",
     )
     parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=1,
+        help="parallel LLM calls (default: 1). The run is dominated by network "
+        "round-trips; raising this is the main speed-up",
+    )
+    parser.add_argument(
         "--cache-dir",
         default=None,
         help="cache LLM responses in this directory (cheap, offline re-runs)",
@@ -180,6 +187,7 @@ def run(args: argparse.Namespace, provider: Provider) -> int:
         validate_examples=not args.no_validate_examples,
         sandbox=args.sandbox,
         language=args.language,
+        concurrency=args.concurrency,
     )
     verified = report.verified_count
     total = len(report.points)

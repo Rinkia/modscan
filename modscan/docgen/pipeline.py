@@ -31,6 +31,9 @@ code you trust. Pass `validate_examples=False` to skip execution, or
 
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 from modscan.detector import detect_extension_points
 from modscan.docgen import examples as ex
 from modscan.docgen import render
@@ -90,6 +93,7 @@ def generate_docs(
     validate_examples: bool = True,
     sandbox: bool = False,
     language: str = "python",
+    concurrency: int = 1,
 ) -> DocReport:
     """Generate modding docs (Markdown + JSON) for the codebase at `root`.
 
@@ -98,6 +102,12 @@ def generate_docs(
     validation; others produce static docs with example status "generated".
     Set `sandbox=True` to validate Python examples in an isolated child process
     instead of the host interpreter (see sandbox.py).
+
+    `concurrency` fans the per-point LLM calls out across threads. The run is
+    dominated by sequential network round-trips (1 + points x (1..retries)), so
+    this is where the wall-clock time is. Output is unaffected: results are
+    collected in input order and in-process validation is serialised. Defaults
+    to 1 (fully sequential) — raise it deliberately.
     """
     retries = ex.clamp_retries(max_example_retries)
 
@@ -117,25 +127,33 @@ def generate_docs(
     )
 
     ext = render.example_ext(language)
-    generated: list[GeneratedPoint] = []
-    for fb in facts:
+    # In-process validation mutates sys.path/sys.modules, so it is serialised
+    # across workers; the LLM calls (the actual bottleneck) still overlap.
+    validation_lock = threading.Lock()
+
+    def build(fb) -> GeneratedPoint:
         guide = provider.generate(SYSTEM, guide_prompt(fb))
         if runtime_validated:
             code, status = ex.make_example(
-                provider, root, fb, retries, validate_examples, sandbox
+                provider, root, fb, retries, validate_examples, sandbox, validation_lock
             )
         else:
             code = ex.extract_code(provider.generate(SYSTEM, example_prompt(fb)))
             status = ExampleStatus.GENERATED  # written by the LLM, not executed
-        generated.append(
-            GeneratedPoint(
-                fact=fb,
-                guide=guide,
-                example_code=code,
-                example_status=status,
-                example_path=render.example_path(fb.point_id, ext),
-            )
+        return GeneratedPoint(
+            fact=fb,
+            guide=guide,
+            example_code=code,
+            example_status=status,
+            example_path=render.example_path(fb.point_id, ext),
         )
+
+    if concurrency > 1 and len(facts) > 1:
+        with ThreadPoolExecutor(max_workers=concurrency) as pool:
+            # `map` yields in input order, so output is identical to serial.
+            generated = list(pool.map(build, facts))
+    else:
+        generated = [build(fb) for fb in facts]
 
     manifest_path = render.write_outputs(out_dir, root, overview, generated)
     return DocReport(

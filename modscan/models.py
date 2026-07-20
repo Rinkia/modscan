@@ -38,10 +38,13 @@ class DynamicImport:
     """A runtime import call — a strong signal of a plugin-loading seam.
 
     e.g. importlib.import_module(...), __import__(...), pkgutil.iter_modules(...),
-    or importlib.metadata.entry_points(...).
+    importlib.metadata.entry_points(...) / pkg_resources.iter_entry_points(...),
+    werkzeug.utils.import_string(...), Loader.load_module(...),
+    importlib.util.find_spec(...), or pkgutil.get_loader(...).
     """
 
     kind: str  # "import_module" | "__import__" | "iter_modules" | "entry_points"
+    # | "import_string" | "load_module" | "find_spec" | "get_loader"
     lineno: int
     # The literal argument if it was a constant string, else None (dynamic).
     argument: str | None = None

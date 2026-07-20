@@ -42,6 +42,18 @@ _DYNAMIC_CALLS = {
     "iter_modules": "iter_modules",
     "walk_packages": "iter_modules",
     "entry_points": "entry_points",
+    # pkg_resources' pre-importlib.metadata entry-point API — same concept
+    # as entry_points(), so it shares that kind rather than inventing a new one.
+    "load_entry_point": "entry_points",
+    "iter_entry_points": "entry_points",
+    # Werkzeug/Django-style "module:attr" string loader.
+    "import_string": "import_string",
+    # importlib.abc.Loader.load_module(name) — legacy loader API.
+    "load_module": "load_module",
+    # importlib.util.find_spec(name) — locates (doesn't yet execute) a module.
+    "find_spec": "find_spec",
+    # pkgutil.get_loader(name) — locates the loader for a dynamically named module.
+    "get_loader": "get_loader",
 }
 
 

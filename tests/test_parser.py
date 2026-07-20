@@ -27,8 +27,9 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modscan.parser import parse_codebase  # noqa: E402
+from modscan.parser import parse_codebase, parse_file  # noqa: E402
 from modscan.graph import build_graph  # noqa: E402
+from modscan.detector import detect_extension_points  # noqa: E402
 
 
 FIXTURE = {
@@ -65,6 +66,30 @@ FIXTURE = {
         "        return 'hi'\n"
     ),
     "pkg/broken.py": "def oops(:\n",  # syntax error on purpose
+    "pkg/loaders.py": (
+        "from werkzeug.utils import import_string\n"
+        "import pkg_resources\n"
+        "import importlib.util\n"
+        "import pkgutil\n"
+        "\n"
+        "def load_by_path(path):\n"
+        "    return import_string(path)\n"
+        "\n"
+        "def load_ep(name):\n"
+        "    return pkg_resources.load_entry_point('myapp', 'myapp.plugins', name)\n"
+        "\n"
+        "def iter_eps():\n"
+        "    return list(pkg_resources.iter_entry_points('myapp.plugins'))\n"
+        "\n"
+        "def legacy_load(loader, name):\n"
+        "    return loader.load_module(name)\n"
+        "\n"
+        "def find(name):\n"
+        "    return importlib.util.find_spec(name)\n"
+        "\n"
+        "def loader_for(name):\n"
+        "    return pkgutil.get_loader(name)\n"
+    ),
 }
 
 
@@ -126,5 +151,66 @@ def test_parser_and_graph() -> None:
     print("OK: parser + graph self-check passed")
 
 
+def test_new_dynamic_calls() -> None:
+    """Each call added for issue #17 is captured as a dynamic import, and
+    surfaces as a plugin_loader extension point once run through the graph
+    and detector layers.
+    """
+    with tempfile.TemporaryDirectory() as root:
+        _write_fixture(root)
+        cb = parse_codebase(root)
+        by_name = {m.qualname: m for m in cb.modules}
+        loaders = by_name["pkg.loaders"]
+        assert loaders.parse_error is None
+
+        kinds = {d.kind for d in loaders.dynamic_imports}
+        # import_string (Werkzeug/Django)
+        assert "import_string" in kinds, kinds
+        # load_entry_point / iter_entry_points (pkg_resources) both collapse
+        # into the "entry_points" kind, same concept as importlib.metadata's.
+        assert "entry_points" in kinds, kinds
+        entry_point_calls = [d for d in loaders.dynamic_imports if d.kind == "entry_points"]
+        assert len(entry_point_calls) == 2, entry_point_calls
+        # load_module (legacy Loader API)
+        assert "load_module" in kinds, kinds
+        # find_spec (importlib.util)
+        assert "find_spec" in kinds, kinds
+        # get_loader (pkgutil)
+        assert "get_loader" in kinds, kinds
+
+        # --- graph + detector: each new call is a plugin_loader seam ---
+        g = build_graph(cb)
+        points = detect_extension_points(g)
+        loader_points = [
+            p for p in points if p.category == "plugin_loader" and p.seam.module == "pkg.loaders"
+        ]
+        seen_kinds = {p.seam.name for p in loader_points}
+        for expected in ("import_string", "entry_points", "load_module", "find_spec", "get_loader"):
+            assert expected in seen_kinds, (expected, seen_kinds)
+
+    print("OK: new dynamic-call detection self-check passed")
+
+
+def test_import_module_still_isolated_via_parse_file() -> None:
+    """Sanity check that parse_file (used directly, not just via parse_codebase)
+    also captures a new call — guards against a regression where only the
+    directory-walking path was updated.
+    """
+    with tempfile.TemporaryDirectory() as root:
+        path = os.path.join(root, "single.py")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(
+                "import importlib.util\n"
+                "def find(name):\n"
+                "    return importlib.util.find_spec(name)\n"
+            )
+        mod = parse_file(path, root)
+        assert any(d.kind == "find_spec" for d in mod.dynamic_imports)
+
+    print("OK: parse_file direct-call self-check passed")
+
+
 if __name__ == "__main__":
     test_parser_and_graph()
+    test_new_dynamic_calls()
+    test_import_module_still_isolated_via_parse_file()

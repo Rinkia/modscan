@@ -35,3 +35,30 @@ jobs:
 
       - name: Import works without LLM SDKs
         run: python -c "import modscan; print('modscan import OK', len(modscan.__all__), 'exports')"
+
+  benchmark-labels-untouched:
+    # The ground truth only means something if it cannot be quietly adjusted in
+    # the same change as the heuristic it would flatter. Labels may still change
+    # - but in their own pull request, reviewed on their own evidence.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Refuse a PR that edits both the labels and the ranking code
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE" "$HEAD")
+          labels=$(echo "$changed" | grep -c '^benchmarks/ground_truth\.json$' || true)
+          ranking=$(echo "$changed" | grep -cE '^modscan/(detector|graph)\.py$' || true)
+          if [ "$labels" -gt 0 ] && [ "$ranking" -gt 0 ]; then
+            echo "::error::This PR changes benchmarks/ground_truth.json AND the ranking code."
+            echo "Split it: land the label change on its own, justified by the target's"
+            echo "documentation, then land the heuristic and report its measured effect."
+            exit 1
+          fi
+          echo "OK: labels and ranking code are not changed together."

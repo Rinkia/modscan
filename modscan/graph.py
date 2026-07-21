@@ -28,6 +28,7 @@ code for value we can't yet use).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 
 from modscan.models import Codebase, DynamicImport, Seam
@@ -74,21 +75,43 @@ def _dynamic_detail(d: DynamicImport) -> str:
 
 
 def _toplevel_reexports(codebase: Codebase) -> set[str]:
-    """Names the package's root __init__ re-exports to its public entry point.
+    """Names re-exported from the public entry points of the scanned tree.
 
-    The scanned tree's root package parses to an empty qualname (parser strips
-    __init__). A symbol is re-exported if the root __init__ lists it in __all__
-    (authoritative when present) or imports it by name. This is the raw material
-    for the detector's re-export signal, computed here where the whole tree is in
-    hand rather than threaded into the detector.
+    A symbol is re-exported if a *top-level package's* ``__init__`` lists it in
+    ``__all__`` (authoritative when present) or imports it by name. This is the
+    raw material for the detector's re-export signal, computed here where the
+    whole tree is in hand rather than threaded into the detector.
+
+    "Top-level package" is decided by filesystem structure, not by qualname: a
+    package ``__init__`` counts when its own parent directory is not itself a
+    package. This matters because the re-export signal must fire the same way
+    whether MODScan is pointed at the package directory (``click/``, root
+    qualname ``""``) or at a parent that contains it (``repo/`` with
+    ``repo/click/``, root qualname ``"click"``) — the latter is what a real
+    checkout and the validator both need, since fully-qualified qualnames are
+    what ``import`` can resolve.
     """
-    root = next((m for m in codebase.ok_modules if m.qualname == ""), None)
-    if root is None:
-        return set()
-    if root.all_exports is not None:
-        return set(root.all_exports)
-    # ponytail: name-match, resolve source module if a real collision shows up.
-    return {imp.name for imp in root.imports if imp.fromlist}
+    init_paths = {
+        m.path for m in codebase.ok_modules if m.path.endswith("__init__.py")
+    }
+
+    def is_toplevel_package(path: str) -> bool:
+        if path not in init_paths:
+            return False
+        package_dir = os.path.dirname(path)
+        parent_init = os.path.join(os.path.dirname(package_dir), "__init__.py")
+        return parent_init not in init_paths
+
+    names: set[str] = set()
+    for m in codebase.ok_modules:
+        if not is_toplevel_package(m.path):
+            continue
+        if m.all_exports is not None:
+            names |= set(m.all_exports)
+        else:
+            # ponytail: name-match, resolve source module if a real collision shows up.
+            names |= {imp.name for imp in m.imports if imp.fromlist}
+    return names
 
 
 def build_graph(codebase: Codebase) -> ExtensionGraph:

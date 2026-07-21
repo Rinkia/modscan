@@ -109,6 +109,44 @@ def test_reexport_signal_lifts_a_floor_seam() -> None:
     print("OK: re-export signal self-check passed")
 
 
+def test_override_point_breaks_a_reexport_tie() -> None:
+    """Two re-exported classes, identical but for an override point, must not tie:
+    the one with a method raising NotImplementedError outranks the other. This is
+    the discriminator that separates a subclass-me base from a concrete class that
+    merely happens to be in the public API.
+    """
+    fixture = {
+        "__init__.py": "from mod import Base, Plain\n__all__ = ['Base', 'Plain']\n",
+        "mod.py": (
+            "class Base:\n"
+            "    def convert(self, v):\n"
+            "        raise NotImplementedError\n"
+            "class Plain:\n"
+            "    def convert(self, v):\n"
+            "        return v\n"
+        ),
+    }
+    with tempfile.TemporaryDirectory() as root:
+        for rel, content in fixture.items():
+            with open(os.path.join(root, rel), "w", encoding="utf-8") as fh:
+                fh.write(content)
+
+        points = detect_extension_points(build_graph(parse_codebase(root)))
+        by_name = {(p.seam.module, p.seam.name): p for p in points}
+        base = by_name[("mod", "Base")]
+        plain = by_name[("mod", "Plain")]
+
+        assert base.seam.reexported and plain.seam.reexported, "both are re-exported"
+        assert base.seam.has_override_point and not plain.seam.has_override_point
+        assert base.score > plain.score, "the override point must break the tie"
+        assert base.category == "subclass"
+        assert any("override point" in s for s in base.signals)
+        assert points.index(base) < points.index(plain)
+
+    print("OK: override-point tie-breaker self-check passed")
+
+
 if __name__ == "__main__":
     test_detector_ranking()
     test_reexport_signal_lifts_a_floor_seam()
+    test_override_point_breaks_a_reexport_tie()

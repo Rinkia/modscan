@@ -210,7 +210,38 @@ def test_import_module_still_isolated_via_parse_file() -> None:
     print("OK: parse_file direct-call self-check passed")
 
 
+def test_override_point_detected() -> None:
+    """A method raising NotImplementedError marks the method, and its class as
+    having an override point. An ordinary method does not.
+    """
+    with tempfile.TemporaryDirectory() as root:
+        path = os.path.join(root, "bases.py")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(
+                "class Base:\n"
+                "    def convert(self, value):\n"
+                "        raise NotImplementedError('override me')\n"
+                "    def helper(self):\n"
+                "        return 1\n"
+                "class Concrete:\n"
+                "    def run(self):\n"
+                "        return 2\n"
+            )
+        cb = parse_codebase(root)
+        methods = {m.name: m for mod in cb.modules for c in mod.classes for m in c.methods}
+        assert methods["convert"].raises_notimplemented is True
+        assert methods["helper"].raises_notimplemented is False
+
+        g = build_graph(cb)
+        seam = {s.name: s for s in g.seams}
+        assert seam["Base"].has_override_point is True
+        assert seam["Concrete"].has_override_point is False
+
+    print("OK: override-point detection self-check passed")
+
+
 if __name__ == "__main__":
     test_parser_and_graph()
     test_new_dynamic_calls()
     test_import_module_still_isolated_via_parse_file()
+    test_override_point_detected()

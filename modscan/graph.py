@@ -117,7 +117,8 @@ def build_graph(codebase: Codebase) -> ExtensionGraph:
             kind = "abstract_class" if cls.is_abstract else "class"
             graph.seams.append(
                 Seam(kind, mod.qualname, cls.name, cls.lineno, detail=",".join(cls.bases),
-                     reexported=cls.name in reexports)
+                     reexported=cls.name in reexports,
+                     has_override_point=any(m.raises_notimplemented for m in cls.methods))
             )
         # seams: dynamic-import sites
         for dyn in mod.dynamic_imports:

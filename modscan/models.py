@@ -78,6 +78,7 @@ class FunctionInfo:
     is_public: bool
     decorators: tuple[str, ...] = ()
     args: tuple[str, ...] = ()
+    raises_notimplemented: bool = False  # body raises NotImplementedError (override point)
 
 
 @dataclass(frozen=True)
@@ -150,6 +151,7 @@ class Seam:
     lineno: int
     detail: str = ""  # bases for classes, decorators, dynamic arg, etc.
     reexported: bool = False  # re-exported from the package's top-level __init__
+    has_override_point: bool = False  # a method raises NotImplementedError
 
 
 @dataclass(frozen=True)

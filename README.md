@@ -116,8 +116,11 @@ ones that can't be validated are clearly marked `unverified`.
 6. ✅ `modscan scaffold <id>` — generate a plugin skeleton from the JSON manifest
 7. ✅ TypeScript/JavaScript front-end (experimental), breaking-change diffs,
    sandboxed validation, spend controls
-8. Next: sharper ranking heuristics, a web UI, and — only with proper legal
-   guardrails — the binary case
+8. ✅ `modscan detect` (offline ranking), GitHub Action, and MCP server
+
+See **[ROADMAP.md](ROADMAP.md)** for what's next, an honest account of where the
+ranking works and where it doesn't (measured across six real packages), and how
+to contribute.
 
 ## Try it in 30 seconds (no API key)
 

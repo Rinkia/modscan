@@ -95,7 +95,7 @@ Measured 2026-07-20 at the pinned versions, before any ranking change.
 | Target | Candidates | Labels | Rank of each label | recall@10 | Median rank |
 |---|---|---|---|---|---|
 | pluggy 1.6.0 | 20 | 3 | 5, 6, 14 | 2/3 | 6 |
-| click 8.4.2 | 152 | 4 | **1, 2**, 38, 39 | 2/4 | 20.5 |
+| click 8.4.2 | 152 | 4 | **1, 2**, 38, 39 | 2/4 | 20 |
 | SQLAlchemy 2.0.51 | 2092 | 5 | 620, 1287, 1369, 1628, 1631 | 0/5 | 1369 |
 
 Aggregate recall@10: **4/12**.
@@ -136,6 +136,28 @@ cannot exceed 0.5 even for a perfect ranker. A metric that cannot reach 1 by
 construction invites adding labels instead of improving the heuristic.
 
 If resolution ever genuinely binds, add **targets** — never labels.
+
+## Running it
+
+```bash
+pip install pluggy==1.6.0 click==8.4.2 sqlalchemy==2.0.51
+python benchmarks/score.py            # all targets
+python benchmarks/score.py --target pluggy
+```
+
+The versions must be the pinned ones — a target installed at any other version
+is skipped with a notice rather than scored, because a score against different
+code would be misleading. The command is offline and free: it runs the detector,
+never the LLM.
+
+The table it prints is the one above. That is the acceptance test for the
+scorer: it reproduces figures that were committed before it existed. If it ever
+disagrees, one of the two is wrong — investigate, do not edit the table to
+match. (It has already earned its keep once: the median it computes corrected a
+by-hand arithmetic slip in this file.)
+
+`tests/test_benchmark_scoring.py` covers the metric maths offline, so CI guards
+the logic without needing the target packages installed.
 
 ## Keeping labels honest
 

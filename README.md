@@ -119,7 +119,39 @@ ones that can't be validated are clearly marked `unverified`.
 8. Next: sharper ranking heuristics, a web UI, and — only with proper legal
    guardrails — the binary case
 
-## Usage
+## Try it in 30 seconds (no API key)
+
+`modscan detect` ranks a codebase's extension points using static analysis only
+— no LLM, no API key, no code execution. It is the fast way to see what MODScan
+finds before committing to a full documentation run. *(Requires modscan ≥ 0.1.1.)*
+
+```bash
+pip install modscan
+modscan detect ./path/to/project            # ranked Markdown table
+modscan detect ./path/to/project --json     # machine-readable, for tooling/CI
+modscan detect ./path/to/project --limit 10 # just the top 10
+```
+
+Point it at an installed package to see it work immediately:
+
+```bash
+modscan detect "$(python -c 'import os,click;print(os.path.dirname(click.__file__))')" --limit 5
+```
+
+### In CI (GitHub Action)
+
+Drop the ranked extension points into every pull request's job summary — safe on
+untrusted PRs, since `detect` runs no LLM and executes no target code:
+
+```yaml
+- uses: actions/checkout@v4
+- uses: Rinkia/modscan@v0.1.0
+  with:
+    path: .
+    min-score: "0.5"
+```
+
+## Full documentation run (uses an LLM)
 
 ```bash
 pip install modscan[anthropic]     # or [openai], [gemini], [typescript]

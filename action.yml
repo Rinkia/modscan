@@ -1,0 +1,56 @@
+# Composite GitHub Action: run `modscan detect` on a checked-out repo and write
+# the ranked extension points to the job summary. No API key, no LLM, no code
+# execution — pure static analysis, so it is safe to run on any pull request.
+name: MODScan extension points
+description: Detect and rank a Python/TypeScript codebase's extension points (no LLM, no API key).
+branding:
+  icon: search
+  color: purple
+
+inputs:
+  path:
+    description: Path to the source tree to scan.
+    required: false
+    default: "."
+  language:
+    description: "Source language: python (default) | typescript | javascript."
+    required: false
+    default: python
+  min-score:
+    description: Minimum moddability score to report.
+    required: false
+    default: "0.5"
+  limit:
+    description: Show only the top N extension points (empty = all).
+    required: false
+    default: "20"
+  modscan-version:
+    description: Version of modscan to install from PyPI (empty = latest).
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install MODScan
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.modscan-version }}" ]; then
+          python -m pip install "modscan==${{ inputs.modscan-version }}"
+        else
+          python -m pip install modscan
+        fi
+
+    - name: Detect extension points
+      shell: bash
+      run: |
+        args=(detect "${{ inputs.path }}" --language "${{ inputs.language }}" --min-score "${{ inputs.min-score }}")
+        if [ -n "${{ inputs.limit }}" ]; then
+          args+=(--limit "${{ inputs.limit }}")
+        fi
+        modscan "${args[@]}" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -119,6 +119,58 @@ def test_detect_bad_root() -> None:
     assert main(["detect", "C:/no/such/dir/modscan-xyz"]) == 2
 
 
+def test_run_fails_fast_on_missing_dependency() -> None:
+    """A target whose deps aren't installed stops before any LLM call, with a
+    classified cause — not empty docs."""
+    from modscan.preflight import PreflightError
+
+    pkg = "clideps"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        with open(os.path.join(d, "__init__.py"), "w", encoding="utf-8") as fh:
+            fh.write("import totally_absent_dep_xyz\n")
+        with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write("class Sink:\n    def write(self, item): ...\n")
+        try:
+            args = build_parser().parse_args([root, "--out", os.path.join(root, "o")])
+
+            def responder(system: str, prompt: str) -> str:
+                raise AssertionError("no LLM call should happen before preflight")
+
+            raised = False
+            try:
+                run(args, FakeProvider(responder))
+            except PreflightError as exc:
+                raised = True
+                assert "totally_absent_dep_xyz" in str(exc)
+                assert "pip install" in str(exc)
+            assert raised, "expected PreflightError"
+        finally:
+            _cleanup(pkg)
+
+
+def test_no_validate_examples_skips_preflight() -> None:
+    """Opting out of executing target code also skips the probe (which imports)."""
+    pkg = "clidepsskip"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        with open(os.path.join(d, "__init__.py"), "w", encoding="utf-8") as fh:
+            fh.write("import totally_absent_dep_xyz\n")
+        with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write("__all__ = ['Sink']\nclass Sink:\n    def write(self, item): ...\n")
+        try:
+            args = build_parser().parse_args(
+                [root, "--out", os.path.join(root, "o"), "--no-validate-examples"]
+            )
+            # No preflight, so the run proceeds and the FakeProvider is used.
+            code = run(args, FakeProvider(lambda s, p: "prose"))
+            assert code == 0
+        finally:
+            _cleanup(pkg)
+
+
 def test_detect_separates_and_dedups_registration_points() -> None:
     """entry_points loader sites go in their own section, deduplicated, out of the
     implement-this ranking."""
@@ -163,4 +215,6 @@ if __name__ == "__main__":
     test_detect_subcommand_no_llm()
     test_detect_bad_root()
     test_detect_separates_and_dedups_registration_points()
+    test_run_fails_fast_on_missing_dependency()
+    test_no_validate_examples_skips_preflight()
     print("OK: cli self-check passed")

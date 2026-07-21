@@ -74,6 +74,29 @@ def _dynamic_detail(d: DynamicImport) -> str:
     return f"{d.kind}({d.argument!r})" if d.argument else d.kind
 
 
+def top_level_packages(codebase: Codebase) -> list:
+    """The package ``__init__`` modules that are entry points of the scanned tree.
+
+    A package ``__init__`` is top-level when its own parent directory is not
+    itself a package. Decided by filesystem structure, not qualname, so it holds
+    whether the scan root is the package (``click/``) or a parent that contains it
+    (``repo/`` with ``repo/click/``). Shared by the re-export signal and the
+    pre-flight import probe.
+    """
+    init_paths = {
+        m.path for m in codebase.ok_modules if m.path.endswith("__init__.py")
+    }
+    roots = []
+    for m in codebase.ok_modules:
+        if m.path not in init_paths:
+            continue
+        package_dir = os.path.dirname(m.path)
+        parent_init = os.path.join(os.path.dirname(package_dir), "__init__.py")
+        if parent_init not in init_paths:
+            roots.append(m)
+    return roots
+
+
 def _toplevel_reexports(codebase: Codebase) -> set[str]:
     """Names re-exported from the public entry points of the scanned tree.
 
@@ -82,30 +105,12 @@ def _toplevel_reexports(codebase: Codebase) -> set[str]:
     raw material for the detector's re-export signal, computed here where the
     whole tree is in hand rather than threaded into the detector.
 
-    "Top-level package" is decided by filesystem structure, not by qualname: a
-    package ``__init__`` counts when its own parent directory is not itself a
-    package. This matters because the re-export signal must fire the same way
-    whether MODScan is pointed at the package directory (``click/``, root
-    qualname ``""``) or at a parent that contains it (``repo/`` with
-    ``repo/click/``, root qualname ``"click"``) — the latter is what a real
-    checkout and the validator both need, since fully-qualified qualnames are
-    what ``import`` can resolve.
+    See ``top_level_packages`` for how "top-level" is decided (filesystem
+    structure, not qualname) and why it must hold whether MODScan is pointed at
+    the package directory or a parent that contains it.
     """
-    init_paths = {
-        m.path for m in codebase.ok_modules if m.path.endswith("__init__.py")
-    }
-
-    def is_toplevel_package(path: str) -> bool:
-        if path not in init_paths:
-            return False
-        package_dir = os.path.dirname(path)
-        parent_init = os.path.join(os.path.dirname(package_dir), "__init__.py")
-        return parent_init not in init_paths
-
     names: set[str] = set()
-    for m in codebase.ok_modules:
-        if not is_toplevel_package(m.path):
-            continue
+    for m in top_level_packages(codebase):
         if m.all_exports is not None:
             names |= set(m.all_exports)
         else:

@@ -73,9 +73,28 @@ def _dynamic_detail(d: DynamicImport) -> str:
     return f"{d.kind}({d.argument!r})" if d.argument else d.kind
 
 
+def _toplevel_reexports(codebase: Codebase) -> set[str]:
+    """Names the package's root __init__ re-exports to its public entry point.
+
+    The scanned tree's root package parses to an empty qualname (parser strips
+    __init__). A symbol is re-exported if the root __init__ lists it in __all__
+    (authoritative when present) or imports it by name. This is the raw material
+    for the detector's re-export signal, computed here where the whole tree is in
+    hand rather than threaded into the detector.
+    """
+    root = next((m for m in codebase.ok_modules if m.qualname == ""), None)
+    if root is None:
+        return set()
+    if root.all_exports is not None:
+        return set(root.all_exports)
+    # ponytail: name-match, resolve source module if a real collision shows up.
+    return {imp.name for imp in root.imports if imp.fromlist}
+
+
 def build_graph(codebase: Codebase) -> ExtensionGraph:
     graph = ExtensionGraph(root=codebase.root)
     known = {m.qualname for m in codebase.ok_modules if m.qualname}
+    reexports = _toplevel_reexports(codebase)
 
     for mod in codebase.ok_modules:
         # dependency edges
@@ -90,13 +109,15 @@ def build_graph(codebase: Codebase) -> ExtensionGraph:
         for fn in mod.public_functions:
             deco = ",".join(fn.decorators)
             graph.seams.append(
-                Seam("function", mod.qualname, fn.name, fn.lineno, detail=deco)
+                Seam("function", mod.qualname, fn.name, fn.lineno, detail=deco,
+                     reexported=fn.name in reexports)
             )
         # seams: public classes (abstract ones flagged separately as subclassable)
         for cls in mod.public_classes:
             kind = "abstract_class" if cls.is_abstract else "class"
             graph.seams.append(
-                Seam(kind, mod.qualname, cls.name, cls.lineno, detail=",".join(cls.bases))
+                Seam(kind, mod.qualname, cls.name, cls.lineno, detail=",".join(cls.bases),
+                     reexported=cls.name in reexports)
             )
         # seams: dynamic-import sites
         for dyn in mod.dynamic_imports:

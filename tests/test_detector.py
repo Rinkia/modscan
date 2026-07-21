@@ -75,5 +75,40 @@ def test_detector_ranking() -> None:
     print("OK: detector ranking self-check passed")
 
 
+def test_reexport_signal_lifts_a_floor_seam() -> None:
+    """A symbol re-exported from the package root outranks an identical one that
+    is not. This is the whole point of the public-API re-export signal: two
+    classes with no other distinguishing signal are separated only by whether the
+    maintainer put them in the public entry point.
+    """
+    # Mirror how MODScan is actually pointed at a package: the scan root IS the
+    # package directory, so its __init__ is the top-level entry point.
+    fixture = {
+        "__init__.py": "from public import Exposed\n__all__ = ['Exposed']\n",
+        "public.py": "class Exposed:\n    pass\n",
+        "internal.py": "class Hidden:\n    pass\n",
+    }
+    with tempfile.TemporaryDirectory() as root:
+        for rel, content in fixture.items():
+            with open(os.path.join(root, rel), "w", encoding="utf-8") as fh:
+                fh.write(content)
+
+        points = detect_extension_points(build_graph(parse_codebase(root)))
+        by_name = {(p.seam.module, p.seam.name): p for p in points}
+
+        exposed = by_name[("public", "Exposed")]
+        hidden = by_name[("internal", "Hidden")]
+
+        assert exposed.seam.reexported, "Exposed is re-exported from lib/__init__.py"
+        assert not hidden.seam.reexported, "Hidden is never re-exported"
+        assert exposed.score > hidden.score, "re-export must lift the score"
+        assert any("re-exported" in s for s in exposed.signals)
+        # and the ranking reflects it
+        assert points.index(exposed) < points.index(hidden)
+
+    print("OK: re-export signal self-check passed")
+
+
 if __name__ == "__main__":
     test_detector_ranking()
+    test_reexport_signal_lifts_a_floor_seam()

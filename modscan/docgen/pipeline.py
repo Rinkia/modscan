@@ -37,7 +37,7 @@ from concurrent.futures import ThreadPoolExecutor
 from modscan.detector import detect_extension_points
 from modscan.docgen import examples as ex
 from modscan.docgen import render
-from modscan.docgen.types import DocReport, GeneratedPoint
+from modscan.docgen.types import DocReport, DroppedPoint, GeneratedPoint
 from modscan.factblocks import build_fact_block, build_module_index, render_fact_block
 from modscan.graph import build_graph
 from modscan.languages import get_language_parser
@@ -56,6 +56,13 @@ def _dependency_summary(dependencies: dict[str, set[str]]) -> str:
     return f"{len(dependencies)} internal modules, {edges} dependency edges"
 
 
+def _drop_reason(detail: str) -> str:
+    """Classify why validation failed, from its detail string. An import failure
+    is often a missing dependency; anything else imported but could not be
+    exercised (not a class, not callable, could not instantiate)."""
+    return "import_failed" if detail.startswith("import failed") else "validation_failed"
+
+
 def _collect_facts(
     codebase: Codebase,
     points: list[ExtensionPoint],
@@ -68,22 +75,36 @@ def _collect_facts(
     Python seams are proven by actually loading them, so only confirmed points
     get documented. Languages we cannot execute document every detected point
     statically instead.
+
+    Returns ``(facts, dropped)``: the fact blocks to document, and the points
+    that failed validation with a classified reason, so the run can explain why
+    it is thinner than the detection rather than filtering silently.
     """
     considered = points[:limit] if limit is not None else points
     index = build_module_index(codebase)
     if not runtime_validated:
-        return [
-            build_fact_block(codebase, p, _STATIC_METHOD, index) for p in considered
-        ]
+        facts = [build_fact_block(codebase, p, _STATIC_METHOD, index) for p in considered]
+        return facts, []
 
     validations = validate_points(root, considered)
+    facts = []
+    dropped = []
     # strict=True: a length mismatch here is a bug, not something to silently
     # truncate away (this used to rely on zip's implicit truncation).
-    return [
-        build_fact_block(codebase, p, v.method, index)
-        for p, v in zip(considered, validations, strict=True)
-        if v.ok
-    ]
+    for p, v in zip(considered, validations, strict=True):
+        if v.ok:
+            facts.append(build_fact_block(codebase, p, v.method, index))
+        else:
+            dropped.append(
+                DroppedPoint(
+                    point_id=f"{p.seam.module}:{p.seam.name}",
+                    category=p.category,
+                    location=f"{p.seam.module}:{p.seam.lineno}",
+                    reason=_drop_reason(v.detail),
+                    detail=v.detail,
+                )
+            )
+    return facts, dropped
 
 
 def generate_docs(
@@ -131,7 +152,7 @@ def generate_docs(
         if not result.ok:
             raise PreflightError(result)
 
-    facts = _collect_facts(codebase, points, root, runtime_validated, limit)
+    facts, dropped = _collect_facts(codebase, points, root, runtime_validated, limit)
 
     overview = provider.generate(
         SYSTEM,
@@ -169,7 +190,8 @@ def generate_docs(
     else:
         generated = [build(fb) for fb in facts]
 
-    manifest_path = render.write_outputs(out_dir, root, overview, generated)
+    manifest_path = render.write_outputs(out_dir, root, overview, generated, dropped)
     return DocReport(
-        out_dir=out_dir, overview=overview, points=generated, manifest_path=manifest_path
+        out_dir=out_dir, overview=overview, points=generated,
+        manifest_path=manifest_path, dropped=dropped,
     )

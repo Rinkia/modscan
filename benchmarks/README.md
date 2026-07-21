@@ -109,6 +109,43 @@ discriminator — a registered compiler, or public API exported from a documente
 submodule (`UserDefinedType` is not re-exported from the root at all). That is
 the next signal to find.
 
+## Does the ranking generalize? (measured on two more packages)
+
+The signals above were judged on pluggy, click and SQLAlchemy — the three they
+were shaped near. To test whether they generalize or were overfit, two more
+targets with *different* extension mechanisms were labelled by the same
+documentation rule and measured. The signals did **not** hold up.
+
+| Target | Candidates | Labels | Rank of each label | recall@10 | Median |
+|---|---|---|---|---|---|
+| pygments 2.20.0 | 768 | 5 | 21, 23, 46, 75, 694 | **0/5** | 46 |
+| marshmallow 4.3.0 | 87 | 3 | 9, 13, 28 | **1/3** | 13 |
+
+Aggregate across all five targets: **9/20**.
+
+Two concrete generalization gaps, both recorded rather than tuned away:
+
+- **pygments — plugin-loader machinery floods the top.** Its entry-point loading
+  sites (`pygments.plugin:entry_points`, the `__import__` shims in
+  `lexers`/`formatters`) score 0.9 as dynamic imports and occupy the whole top of
+  the ranking, burying the real bases. `Filter` (21) and `Lexer` (23) get the
+  override-point lift but only to the low twenties; `Style` (694) is caught by
+  nothing. The dynamic-import weight, tuned where loaders were rare, is
+  miscalibrated for a package built around a plugin registry.
+- **marshmallow — override-point is convention-specific.** The signal assumes a
+  base signals "override me" by raising `NotImplementedError`. marshmallow 4.x
+  defines `Field._serialize`/`_deserialize` as **noops**, so the signal never
+  fires and `Field` stays at 28. `Schema` (9) is caught by re-export; `Validator`
+  (13) by neither. A base extended by overriding a noop is invisible to a signal
+  that looks for a raise.
+
+**Verdict**: the re-export signal generalizes (it caught `Schema` and helps
+everywhere); the override-point and dynamic-import weights do **not** — they were
+calibrated to the first three packages' conventions. This is the overfitting the
+PRD's top risk named, now measured instead of feared. No weight was changed to
+hide it: fixing these is a future, separately-measured signal (a plugin-registry
+discount, or a broader "documented override" detector), not a quiet re-tune.
+
 ## Hypotheses this benchmark has already killed
 
 Recorded so nobody spends a weekend re-deriving them.

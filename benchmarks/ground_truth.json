@@ -69,6 +69,52 @@
           "justification": "Docs 'Custom DDL': custom DDL constructs are defined by subclassing ExecutableDDLElement and attaching a compiler."
         }
       ]
+    },
+    "pygments": {
+      "version": "2.20.0",
+      "docs": "https://pygments.org/docs/",
+      "note": "Added to test whether the re-export and override-point signals generalize. Its seams are a mix: Lexer/Filter have override points, Formatter is root-re-exported, and Style is caught by neither - Style is labelled anyway, and its low rank is the honest generalization gap.",
+      "extension_points": [
+        {
+          "id": "pygments.lexer:Lexer",
+          "justification": "Docs 'Write your own lexer': a new lexer is written by subclassing Lexer (or RegexLexer) and implementing get_tokens_unprocessed."
+        },
+        {
+          "id": "pygments.lexer:RegexLexer",
+          "justification": "Docs 'RegexLexer': the base class most lexers subclass, defining token rules in a `tokens` dict rather than hand-writing the tokeniser."
+        },
+        {
+          "id": "pygments.formatter:Formatter",
+          "justification": "Docs 'Write your own formatter': a custom output format is produced by subclassing Formatter and implementing the format() method."
+        },
+        {
+          "id": "pygments.style:Style",
+          "justification": "Docs 'Creating own styles': a colour scheme is defined by subclassing Style and setting the `styles` mapping of token types to style rules."
+        },
+        {
+          "id": "pygments.filter:Filter",
+          "justification": "Docs 'Write your own filter': a token-stream filter is written by subclassing Filter and implementing filter()."
+        }
+      ]
+    },
+    "marshmallow": {
+      "version": "4.3.0",
+      "docs": "https://marshmallow.readthedocs.io/",
+      "note": "Added to test whether override-point generalizes. It does NOT here: marshmallow 4.x defines Field._serialize/_deserialize as noops, not NotImplementedError raisers, so the override-point signal never fires and Field stays missed. Schema is caught by re-export. An honest generalization gap.",
+      "extension_points": [
+        {
+          "id": "marshmallow.schema:Schema",
+          "justification": "Docs 'Quickstart': a schema is defined by subclassing Schema and declaring fields as class attributes. It is the primary marshmallow extension point."
+        },
+        {
+          "id": "marshmallow.fields:Field",
+          "justification": "Docs 'Custom fields': a custom field is created by subclassing Field and overriding _serialize and _deserialize (which are noops on the base in marshmallow 4.x, not NotImplementedError raisers)."
+        },
+        {
+          "id": "marshmallow.validate:Validator",
+          "justification": "Docs 'Validation - Validator classes': a reusable validator is written as a class extending the Validator base and implementing __call__."
+        }
+      ]
     }
   }
 }

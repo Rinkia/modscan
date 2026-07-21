@@ -35,12 +35,31 @@ class GeneratedPoint:
     example_path: str
 
 
+@dataclass(frozen=True)
+class DroppedPoint:
+    """An extension point detected but not documented, because validating it —
+    loading and exercising the seam — failed. Recorded with a classified reason
+    so the run explains *why* it is thinner than the detection, instead of
+    filtering silently."""
+
+    point_id: str
+    category: str
+    location: str
+    reason: str  # "import_failed" (often a missing dependency) | "validation_failed"
+    detail: str
+
+    @property
+    def likely_missing_dependency(self) -> bool:
+        return self.reason == "import_failed"
+
+
 @dataclass
 class DocReport:
     out_dir: str
     overview: str
     points: list[GeneratedPoint] = field(default_factory=list)
     manifest_path: str = ""
+    dropped: list[DroppedPoint] = field(default_factory=list)
 
     @property
     def verified_count(self) -> int:

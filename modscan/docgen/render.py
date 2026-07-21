@@ -52,7 +52,29 @@ def _write(path: str, content: str) -> None:
         fh.write(content)
 
 
-def render_index(overview: str, generated: list[GeneratedPoint]) -> str:
+def _render_dropped(dropped: list) -> list[str]:
+    """A section explaining points that were detected but not documented, so a
+    thin result reads as 'these could not be validated' rather than silence."""
+    if not dropped:
+        return []
+    import_failures = [d for d in dropped if d.likely_missing_dependency]
+    lines = ["", "## Not documented", ""]
+    if import_failures:
+        lines += [
+            f"{len(import_failures)} point(s) could not be imported — often a sign "
+            "the target's dependencies are not installed in this environment. "
+            "Install the target (e.g. `pip install -e .` in its checkout) and "
+            "re-run to document them.",
+            "",
+        ]
+    lines += ["| Point | Category | Reason | Detail |", "| --- | --- | --- | --- |"]
+    for d in dropped:
+        reason = "import failed" if d.likely_missing_dependency else "validation failed"
+        lines.append(f"| `{d.point_id}` | {d.category} | {reason} | {d.detail} |")
+    return lines
+
+
+def render_index(overview: str, generated: list[GeneratedPoint], dropped: list | None = None) -> str:
     lines = [
         "# Modding Guide",
         "",
@@ -78,6 +100,7 @@ def render_index(overview: str, generated: list[GeneratedPoint]) -> str:
             f"| `{gp.fact.point_id}` | {gp.fact.category} | "
             f"{gp.fact.module}:{gp.fact.lineno} | {badge} |"
         )
+    lines += _render_dropped(dropped or [])
     lines += ["", "See [plugin-guide.md](plugin-guide.md) for how to build each one."]
     return "\n".join(lines) + "\n"
 
@@ -110,12 +133,13 @@ def render_guide(generated: list[GeneratedPoint]) -> str:
 
 
 def write_outputs(
-    out_dir: str, root: str, overview: str, generated: list[GeneratedPoint]
+    out_dir: str, root: str, overview: str, generated: list[GeneratedPoint],
+    dropped: list | None = None,
 ) -> str:
     """Write every artifact; returns the manifest path."""
     os.makedirs(os.path.join(out_dir, "examples"), exist_ok=True)
 
-    _write(os.path.join(out_dir, "index.md"), render_index(overview, generated))
+    _write(os.path.join(out_dir, "index.md"), render_index(overview, generated, dropped))
     _write(os.path.join(out_dir, "plugin-guide.md"), render_guide(generated))
     for gp in generated:
         _write(os.path.join(out_dir, gp.example_path), gp.example_code + "\n")

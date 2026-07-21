@@ -338,6 +338,19 @@ def run(args: argparse.Namespace, provider: Provider) -> int:
     unverified = sum(1 for p in report.points if p.example_status == "unverified")
     print(f"Scanned: {args.root}")
     print(f"Extension points documented: {total} (verified: {verified}, unverified: {unverified})")
+    if report.dropped:
+        import_failures = sum(1 for d in report.dropped if d.likely_missing_dependency)
+        other = len(report.dropped) - import_failures
+        print(
+            f"Dropped (not documented): {len(report.dropped)} "
+            f"({import_failures} import failures, {other} validation failures)"
+        )
+        if import_failures:
+            print(
+                "  Import failures often mean the target's dependencies are not "
+                "installed — `pip install -e .` in its checkout, then re-run. "
+                "See the 'Not documented' section of index.md."
+            )
     print(f"Docs:     {os.path.join(args.out, 'index.md')}")
     print(f"          {os.path.join(args.out, 'plugin-guide.md')}")
     print(f"Manifest: {report.manifest_path}")

@@ -150,6 +150,38 @@ def test_run_fails_fast_on_missing_dependency() -> None:
             _cleanup(pkg)
 
 
+def test_dropped_points_are_classified_and_reported() -> None:
+    """A point whose module fails to import (missing dep) is dropped with reason
+    'import_failed', counted in the report, and shown in index.md — not silent."""
+    from modscan.docgen import generate_docs
+
+    pkg = "clidropped"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        # top-level package imports cleanly -> preflight passes
+        open(os.path.join(d, "__init__.py"), "w").close()
+        # but this module needs an absent dependency, so validating its seam fails
+        with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write(
+                "import totally_absent_dep_xyz\n"
+                "__all__ = ['Sink']\n"
+                "class Sink:\n    def write(self, item): ...\n"
+            )
+        try:
+            out = os.path.join(root, "o")
+            report = generate_docs(root, FakeProvider(lambda s, p: "prose"), out, min_score=0.0)
+            assert report.dropped, "the un-importable seam should be recorded, not silent"
+            sink = [d for d in report.dropped if d.point_id.endswith(":Sink")]
+            assert sink and sink[0].reason == "import_failed", report.dropped
+
+            index = open(os.path.join(out, "index.md"), encoding="utf-8").read()
+            assert "## Not documented" in index
+            assert "dependencies are not installed" in index
+        finally:
+            _cleanup(pkg)
+
+
 def test_no_validate_examples_skips_preflight() -> None:
     """Opting out of executing target code also skips the probe (which imports)."""
     pkg = "clidepsskip"
@@ -216,5 +248,6 @@ if __name__ == "__main__":
     test_detect_bad_root()
     test_detect_separates_and_dedups_registration_points()
     test_run_fails_fast_on_missing_dependency()
+    test_dropped_points_are_classified_and_reported()
     test_no_validate_examples_skips_preflight()
     print("OK: cli self-check passed")

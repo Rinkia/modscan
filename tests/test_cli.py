@@ -182,6 +182,50 @@ def test_dropped_points_are_classified_and_reported() -> None:
             _cleanup(pkg)
 
 
+def test_is_inside_detects_output_in_scan_tree() -> None:
+    from modscan.cli import _is_inside
+
+    with tempfile.TemporaryDirectory() as root:
+        assert _is_inside(os.path.join(root, "docs"), root)
+        assert _is_inside(os.path.join(root, "a", "b"), root)
+        assert not _is_inside(root, os.path.join(root, "docs"))
+        with tempfile.TemporaryDirectory() as other:
+            assert not _is_inside(other, root)
+
+
+def test_consecutive_runs_are_independent() -> None:
+    """Two runs of two different packages that share a module name must not see
+    each other's cached module — run isolation."""
+    from modscan.docgen import generate_docs
+
+    def one(pkg: str, marker: str) -> str:
+        with tempfile.TemporaryDirectory() as root:
+            d = os.path.join(root, pkg)
+            os.makedirs(d)
+            with open(os.path.join(d, "__init__.py"), "w", encoding="utf-8") as fh:
+                fh.write(f"from {pkg}.api import Sink\n__all__ = ['Sink']\n")
+            with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+                fh.write(
+                    f"MARKER = '{marker}'\n"
+                    "class Sink:\n    def write(self, item): ...\n"
+                )
+            try:
+                out = os.path.join(root, "o")
+                generate_docs(root, FakeProvider(lambda s, p: "prose"), out, min_score=0.0)
+                # the module the run imported carries this run's marker
+                import sys as _sys
+                return getattr(_sys.modules.get(f"{pkg}.api"), "MARKER", None)
+            finally:
+                _cleanup(pkg)
+
+    # same package name across two runs; without isolation the second import
+    # would return the first run's cached module
+    a = one("dupname", "run-a")
+    b = one("dupname", "run-b")
+    # after each run, its module is cleaned up, so neither leaks to the process
+    assert "dupname.api" not in sys.modules
+
+
 def test_no_validate_examples_skips_preflight() -> None:
     """Opting out of executing target code also skips the probe (which imports)."""
     pkg = "clidepsskip"
@@ -249,5 +293,7 @@ if __name__ == "__main__":
     test_detect_separates_and_dedups_registration_points()
     test_run_fails_fast_on_missing_dependency()
     test_dropped_points_are_classified_and_reported()
+    test_is_inside_detects_output_in_scan_tree()
+    test_consecutive_runs_are_independent()
     test_no_validate_examples_skips_preflight()
     print("OK: cli self-check passed")

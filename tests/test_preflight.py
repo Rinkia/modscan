@@ -93,9 +93,31 @@ def test_no_package_nothing_to_probe() -> None:
         assert result.ok, result
 
 
+def test_preserve_sys_modules_removes_new_imports() -> None:
+    """Modules imported inside the block are gone after it; pre-existing stay."""
+    import importlib
+    from modscan.execution import preserve_sys_modules, sys_path
+
+    pkg = "isolationpkg"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        open(os.path.join(d, "__init__.py"), "w").close()
+
+        assert pkg not in sys.modules
+        with preserve_sys_modules():
+            with sys_path(root):
+                importlib.import_module(pkg)
+            assert pkg in sys.modules, "imported inside the block"
+        assert pkg not in sys.modules, "removed on exit, so the next run is clean"
+        # a module already loaded before the block is left untouched
+        assert "os" in sys.modules
+
+
 if __name__ == "__main__":
     test_missing_dependency_is_named()
     test_clean_target_passes()
     test_own_broken_import_is_not_called_a_missing_dependency()
     test_no_package_nothing_to_probe()
+    test_preserve_sys_modules_removes_new_imports()
     print("OK: preflight self-check passed")

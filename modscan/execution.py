@@ -56,6 +56,25 @@ def sys_path(entry: str) -> Iterator[None]:
             sys.path.remove(entry)
 
 
+@contextlib.contextmanager
+def preserve_sys_modules() -> Iterator[None]:
+    """Remove modules imported inside the block, so a run does not leak the
+    target's modules into the next one.
+
+    Validation imports target modules by name (e.g. ``core``). Without cleanup, a
+    second run against a different tree would get the first run's cached module
+    of the same name instead of re-importing — cross-run contamination. Only
+    modules that were not present on entry are removed; anything already loaded
+    (MODScan's own modules, the stdlib) is left untouched.
+    """
+    before = set(sys.modules)
+    try:
+        yield
+    finally:
+        for name in set(sys.modules) - before:
+            del sys.modules[name]
+
+
 def load_symbol(root: str, module_qualname: str, name: str) -> Any:
     """Import the target module (with `root` importable) and return an attribute.
 

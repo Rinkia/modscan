@@ -42,6 +42,43 @@ Partial lists are acceptable — SQLAlchemy has more documented seams than are
 labelled here. Recall against a partial list is still a valid regression signal.
 What matters is that labels are never *silently* added to make a number move.
 
+## Signals judged
+
+### Accepted: re-export from the package's public entry point
+
+*"A symbol the maintainer re-exports from the top-level `__init__` is more likely
+a real seam than one buried in a submodule."* **Measured, adopted.**
+
+The detector adds a weight (`_W_REEXPORT`) when a seam's name is re-exported from
+the scanned package's root `__init__` — via `__all__` when present, else the
+names it imports.
+
+| Target | recall@10 before | recall@10 after | median before | median after |
+|---|---|---|---|---|
+| pluggy 1.6.0 | 2/3 | **3/3** | 6 | 4 |
+| click 8.4.2 | 2/4 | **4/4** | 20 | 6 |
+| SQLAlchemy 2.0.51 | 0/5 | 0/5 | 1369 | **290** |
+| **Aggregate** | **4/12** | **7/12** | | |
+
+It clears the acceptance bar — recall@10 improves on two targets and regresses
+none. Reproduce with `python benchmarks/score.py`.
+
+Two things the measurement made explicit:
+
+- **It is necessary but not sufficient for SQLAlchemy.** SQLAlchemy re-exports
+  237 names from its root, so all five labels get the same lift as hundreds of
+  other symbols and stay tied outside the top 10 — recall@10 cannot move there at
+  any weight. The median dropping 1369 → 290 is the real evidence it helps;
+  breaking that tie needs a *second* discriminator, which is the next signal to
+  find.
+- **The weight is not a knife-edge, but it has a ceiling.** Anything in
+  0.5–0.7 clears the bar without regressing a target; pushing to 0.9 starts
+  demoting real click seams below re-exported non-seams (`confirmation_option`,
+  `version_option`). 0.7 is the adopted value — above the abstract-class weight,
+  because public-API membership is a more deliberate signal of intent than
+  abstractness, but below the dynamic-import weight, which is still the strongest
+  single seam.
+
 ## Hypotheses this benchmark has already killed
 
 Recorded so nobody spends a weekend re-deriving them.

@@ -149,6 +149,7 @@ class Seam:
     name: str  # symbol name (or dynamic-import kind)
     lineno: int
     detail: str = ""  # bases for classes, decorators, dynamic arg, etc.
+    reexported: bool = False  # re-exported from the package's top-level __init__
 
 
 @dataclass(frozen=True)

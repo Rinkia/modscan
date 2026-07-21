@@ -35,6 +35,7 @@ _W_ABSTRACT = 0.6  # ABC / abstractmethod = designed to be subclassed
 _W_NAME_HOOK = 0.5  # register_/on_/hook_/subscribe... in a function name
 _W_NAME_CLASS_ROLE = 0.45  # *Plugin / *Handler / *Backend... class name
 _W_REGISTRATION_DECORATOR = 0.4  # decorated with a register/hook-looking decorator
+_W_REEXPORT = 0.7  # re-exported from the package's public entry point (top-level __init__)
 _W_PUBLIC_BASELINE = 0.1  # merely being public API
 
 # Function-name prefixes/substrings that signal a hook or registration seam.
@@ -117,6 +118,10 @@ def _score_class(seam: Seam) -> ExtensionPoint:
         score += _W_NAME_CLASS_ROLE
         signals.append(f"subclasses a '{role_base}' role type")
 
+    if seam.reexported:
+        score += _W_REEXPORT
+        signals.append("re-exported from the package's public entry point")
+
     category = "subclass" if (seam.kind == "abstract_class" or suffix or role_base) else "api"
     return ExtensionPoint(seam, category, min(score, _SCORE_MAX), tuple(signals))
 
@@ -138,6 +143,10 @@ def _score_function(seam: Seam) -> ExtensionPoint:
         signals.append(f"registration-style decorator ('{deco}')")
         if category == "api":
             category = "registration"
+
+    if seam.reexported:
+        score += _W_REEXPORT
+        signals.append("re-exported from the package's public entry point")
 
     return ExtensionPoint(seam, category, min(score, _SCORE_MAX), tuple(signals))
 

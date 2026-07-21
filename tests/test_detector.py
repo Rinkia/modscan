@@ -106,6 +106,33 @@ def test_reexport_signal_lifts_a_floor_seam() -> None:
         # and the ranking reflects it
         assert points.index(exposed) < points.index(hidden)
 
+
+def test_reexport_fires_when_scanning_a_parent_directory() -> None:
+    """Re-export must fire whether MODScan is pointed at the package or its parent.
+
+    Pointing at a parent (``repo/`` containing ``repo/pkg/``) is what a real
+    checkout looks like and what the validator needs — fully-qualified qualnames
+    (``pkg.public``) are what ``import`` can resolve. The signal keys off
+    filesystem structure, not a qualname of "", so it must still fire here.
+    """
+    with tempfile.TemporaryDirectory() as parent:
+        pkg = os.path.join(parent, "pkg")
+        os.makedirs(pkg)
+        with open(os.path.join(pkg, "__init__.py"), "w", encoding="utf-8") as fh:
+            fh.write("from pkg.public import Exposed\n__all__ = ['Exposed']\n")
+        with open(os.path.join(pkg, "public.py"), "w", encoding="utf-8") as fh:
+            fh.write("class Exposed:\n    pass\n")
+        with open(os.path.join(pkg, "internal.py"), "w", encoding="utf-8") as fh:
+            fh.write("class Hidden:\n    pass\n")
+
+        points = detect_extension_points(build_graph(parse_codebase(parent)))
+        by_name = {p.seam.name: p for p in points}
+        # qualnames are fully qualified (importable), and re-export still fires
+        assert by_name["Exposed"].seam.module == "pkg.public"
+        assert by_name["Exposed"].seam.reexported
+        assert not by_name["Hidden"].seam.reexported
+        assert by_name["Exposed"].score > by_name["Hidden"].score
+
     print("OK: re-export signal self-check passed")
 
 
@@ -178,5 +205,6 @@ def test_import_builtin_scored_below_real_loaders() -> None:
 if __name__ == "__main__":
     test_detector_ranking()
     test_reexport_signal_lifts_a_floor_seam()
+    test_reexport_fires_when_scanning_a_parent_directory()
     test_override_point_breaks_a_reexport_tie()
     test_import_builtin_scored_below_real_loaders()

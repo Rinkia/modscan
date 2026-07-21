@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-21
+
+Robustness for runs against real, imperfect codebases, and cleaner output.
+
+### Added
+
+- **Pre-flight import probe.** Before a documentation run does expensive work, it
+  checks whether the target imports. If the target or its dependencies cannot be
+  imported, the run stops immediately — before any LLM call — with a classified
+  cause (missing dependency vs. the target itself not importing) and a
+  `pip install` remediation, instead of grinding through to empty docs. Rides the
+  existing execute-code consent; `--no-validate-examples` skips it.
+- **Classified drop reporting.** Extension points that fail validation are no
+  longer filtered out silently: they are counted and labelled (`import_failed`,
+  often a missing dependency, vs. `validation_failed`) in the CLI summary and in
+  a "Not documented" section of `index.md`.
+- **`modscan detect`: a separate "Plugin registration points" section.**
+  `entry_points`-style loader sites — how a framework discovers plugins — are
+  reported apart from the implement-this ranking and de-duplicated, so they no
+  longer flood the top of a plugin-registry package's output.
+
+### Changed
+
+- **Runs are isolated.** Modules imported during validation are removed after the
+  run, so two consecutive runs against different trees in one process no longer
+  contaminate each other via cached modules of the same name.
+
+### Fixed
+
+- **The re-export signal now fires when scanning a parent directory**, not only
+  when pointed straight at the package. A real checkout (or the showcase's temp
+  copy) has the package nested one level down; the signal keys off filesystem
+  structure so re-export ranking and importable, fully-qualified qualnames hold
+  together. This is what made the first real documentation run produce zero
+  points before the fix.
+- **Self-scan guard.** The CLI warns when `--out` resolves inside the scanned
+  tree, which would make a later run scan this run's generated files.
+
 ## [0.1.1] - 2026-07-21
 
 ### Added
@@ -165,7 +203,8 @@ Initial MVP: the full pipeline, end to end.
   skeletons from the manifest.
 - Apache-2.0 licensing.
 
-[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/Rinkia/modscan/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rinkia/modscan/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rinkia/modscan/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/Rinkia/modscan/releases/tag/v0.0.1

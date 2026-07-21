@@ -146,7 +146,37 @@ def test_override_point_breaks_a_reexport_tie() -> None:
     print("OK: override-point tie-breaker self-check passed")
 
 
+def test_import_builtin_scored_below_real_loaders() -> None:
+    """builtin __import__ is reflection/lazy-import, not a plugin mechanism: it is
+    detected but must not outrank a genuine loader like importlib.import_module.
+    """
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "loaders.py"), "w", encoding="utf-8") as fh:
+            fh.write(
+                "import importlib\n"
+                "def lazy(name):\n"
+                "    return __import__(name)\n"
+                "def load_plugin(name):\n"
+                "    return importlib.import_module(name)\n"
+            )
+        points = detect_extension_points(build_graph(parse_codebase(root)))
+        by_kind = {p.seam.name: p for p in points if p.seam.kind == "dynamic_import"}
+
+        assert "__import__" in by_kind, "still detected"
+        assert "import_module" in by_kind, "genuine loader detected"
+
+        reflection = by_kind["__import__"]
+        loader = by_kind["import_module"]
+        assert reflection.category == "reflection"
+        assert loader.category == "plugin_loader"
+        assert reflection.score < loader.score, "reflection must rank below a real loader"
+        assert points.index(loader) < points.index(reflection)
+
+    print("OK: __import__ reflection self-check passed")
+
+
 if __name__ == "__main__":
     test_detector_ranking()
     test_reexport_signal_lifts_a_floor_seam()
     test_override_point_breaks_a_reexport_tie()
+    test_import_builtin_scored_below_real_loaders()

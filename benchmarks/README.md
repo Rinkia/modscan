@@ -79,6 +79,36 @@ Two things the measurement made explicit:
   abstractness, but below the dynamic-import weight, which is still the strongest
   single seam.
 
+### Accepted (partial): a class with an override point
+
+*"A class with a method that raises `NotImplementedError` is a
+subclass-and-implement base."* **Measured, adopted, and explicitly partial.**
+
+Milestone 3 lifted SQLAlchemy's five labels into a flat band of ~316 symbols all
+scoring 0.80 — re-export moved them up but could not separate them. This signal
+reads *inside* the methods: `_W_OVERRIDE_POINT` is added when a class defines a
+method whose body raises `NotImplementedError`. It is selective (94 of the public
+classes, 22 of the re-exported ones) and non-circular — it reads the code's own
+structure, not its docs or its export list.
+
+| Target | recall@10 before | after | median before | after |
+|---|---|---|---|---|
+| pluggy 1.6.0 | 3/3 | 3/3 | 4 | 4 |
+| click 8.4.2 | 4/4 | 4/4 | 6 | 6 |
+| SQLAlchemy 2.0.51 | 0/5 | **1/5** | 290 | 270 |
+| **Aggregate** | **7/12** | **8/12** | | |
+
+It clears the bar — SQLAlchemy improves, nothing regresses — but the gain is
+**one label, not the tie broken**. `Dialect` (129 → 8) and `TypeDecorator`
+(253 → 47) both reach the maximum score; only `Dialect` reaches the top ten,
+because the maximum-score band is itself ~46 wide. The remaining three labels are
+untouched **by design**: `FunctionElement`, `ExecutableDDLElement` and
+`UserDefinedType` extend by subclass **and compiler registration**, not by method
+override, so they raise no `NotImplementedError`. Surfacing them needs a *third*
+discriminator — a registered compiler, or public API exported from a documented
+submodule (`UserDefinedType` is not re-exported from the root at all). That is
+the next signal to find.
+
 ## Hypotheses this benchmark has already killed
 
 Recorded so nobody spends a weekend re-deriving them.

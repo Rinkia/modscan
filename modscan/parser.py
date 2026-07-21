@@ -89,6 +89,24 @@ def _first_string_arg(call: ast.Call) -> str | None:
     return None
 
 
+def _raises_notimplemented(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
+    """True if the body raises NotImplementedError — the mark of an override point.
+
+    Covers the call, bare-name and attribute forms (`raise NotImplementedError`,
+    `raise NotImplementedError("...")`, `raise exc.NotImplementedError`).
+    """
+    for n in ast.walk(node):
+        if not isinstance(n, ast.Raise) or n.exc is None:
+            continue
+        exc = n.exc
+        if isinstance(exc, ast.Call):
+            exc = exc.func
+        name = getattr(exc, "id", None) or getattr(exc, "attr", None)
+        if name == "NotImplementedError":
+            return True
+    return False
+
+
 def _parse_function(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionInfo:
     return FunctionInfo(
         name=node.name,
@@ -96,6 +114,7 @@ def _parse_function(node: ast.FunctionDef | ast.AsyncFunctionDef) -> FunctionInf
         is_public=_is_public(node.name),
         decorators=tuple(_dotted_name(d) for d in node.decorator_list),
         args=tuple(a.arg for a in node.args.args),
+        raises_notimplemented=_raises_notimplemented(node),
     )
 
 

@@ -119,10 +119,48 @@ def test_detect_bad_root() -> None:
     assert main(["detect", "C:/no/such/dir/modscan-xyz"]) == 2
 
 
+def test_detect_separates_and_dedups_registration_points() -> None:
+    """entry_points loader sites go in their own section, deduplicated, out of the
+    implement-this ranking."""
+    import io
+    from contextlib import redirect_stdout
+
+    pkg = "cliregister"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        open(os.path.join(d, "__init__.py"), "w").close()
+        with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write("class Sink:\n    def write(self, item): ...\n")
+        # two entry_points call-sites in one module -> one deduplicated row
+        with open(os.path.join(d, "loader.py"), "w", encoding="utf-8") as fh:
+            fh.write(
+                "from importlib.metadata import entry_points\n"
+                "def load_a():\n    return entry_points(group='a')\n"
+                "def load_b():\n    return entry_points(group='b')\n"
+            )
+        try:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                assert main(["detect", root, "--min-score", "0.0"]) == 0
+            out = buf.getvalue()
+
+            assert "## Plugin registration points" in out
+            head, _, reg = out.partition("## Plugin registration points")
+            assert "Sink" in head, "implement-this seam belongs in the main table"
+            assert "entry_points" not in head, "loader must not be in the main table"
+            assert "entry_points" in reg
+            # deduplicated: the two call-sites collapse to a single row
+            assert reg.count("| `entry_points`") == 1, reg
+        finally:
+            _cleanup(pkg)
+
+
 if __name__ == "__main__":
     test_parser_defaults()
     test_run_with_fake_provider()
     test_main_bad_root()
     test_detect_subcommand_no_llm()
     test_detect_bad_root()
+    test_detect_separates_and_dedups_registration_points()
     print("OK: cli self-check passed")

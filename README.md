@@ -45,19 +45,37 @@ valuable part everyone skips: **extension-point discovery**.
 
 ## How it works
 
-```
-source
-  -> [1] AST Parser          deterministic, no LLM
-  -> [2] Extension Graph     call graph, public seams
-  -> [3] Extension Detector  heuristics + moddability ranking
-  -> [5] Validator           generate an example plugin, actually load it
-  -> [4] Doc Generator       LLM, grounded on the graph
-  -> modding-docs/
+```mermaid
+flowchart TD
+    SRC["Source-available codebase"]
+    SRC --> PARSE["1 · Parse — AST into a shared model<br/>deterministic, no LLM"]
+    PARSE --> GRAPH["2 · Extension graph — dependencies and public seams"]
+    GRAPH --> DETECT["3 · Detect — score and rank seams by moddability"]
+
+    DETECT -->|"modscan detect · no LLM, no API key"| RANK["Ranked extension points<br/>Markdown or JSON"]
+
+    DETECT --> PROBE{"Pre-flight:<br/>does the target import?"}
+    PROBE -->|no| FAIL["Stop early — cause plus a pip install remediation<br/>no LLM call spent"]
+    PROBE -->|yes| VALIDATE["5 · Validate — load each seam against the target"]
+    VALIDATE --> FACTS["FactBlocks — facts from static analysis only"]
+    FACTS --> LLM["4 · Doc generator — LLM prose grounded on FactBlocks"]
+    LLM --> DOCS["modding-docs/<br/>index.md · plugin-guide.md · examples/ · extension-points.json"]
+    DOCS --> SCAFFOLD["modscan scaffold — a plugin skeleton from the manifest"]
+
+    classDef trust stroke-dasharray:5 5;
+    class VALIDATE,LLM trust;
 ```
 
-Layers 1-3 are deterministic and verifiable. The LLM (layer 4) only explains
-what the analysis found. The Validator (layer 5) is built *before* the doc
-generator so every later stage is measurable against a plugin that really loads.
+Facts come from the parser, prose from the LLM, correctness from the validator.
+Layers 1–3 are deterministic and verifiable; the LLM (layer 4) only ever sees the
+structured FactBlocks, never raw source, so it explains what the analysis found
+rather than inventing it. The Validator (layer 5) is built *before* the doc
+generator, so every later stage is measurable against a plugin that really loads.
+
+The dashed stages **import and execute target code** — that is where a real
+plugin is loaded to prove a seam. Run only on code you trust; `--sandbox`
+contains it in a child process, and `--no-validate-examples` skips execution
+entirely (and, with it, the pre-flight probe).
 
 ## Scope (MVP)
 

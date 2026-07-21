@@ -319,6 +319,16 @@ _SUBCOMMANDS = {
 }
 
 
+def _is_inside(inner: str, outer: str) -> bool:
+    """True if `inner` resolves to a path inside `outer` (the scanned tree)."""
+    try:
+        outer_real = os.path.realpath(outer)
+        inner_real = os.path.realpath(inner)
+        return os.path.commonpath([inner_real, outer_real]) == outer_real
+    except ValueError:  # different drives on Windows -> not inside
+        return False
+
+
 def run(args: argparse.Namespace, provider: Provider) -> int:
     """Run the pipeline with an already-constructed provider. Returns exit code."""
     report = generate_docs(
@@ -374,6 +384,17 @@ def main(argv: list[str] | None = None) -> int:
             "warning: MODScan will IMPORT and EXECUTE code under "
             f"'{args.root}' to validate examples. Run only on code you trust "
             "(use --no-validate-examples to skip).",
+            file=sys.stderr,
+        )
+
+    # Self-scan guard: writing output inside the scanned tree makes the next run
+    # scan this run's generated files. Warn and point at a fix, rather than
+    # silently rescanning generated output.
+    if _is_inside(args.out, args.root):
+        print(
+            f"warning: output '{args.out}' is inside the scanned tree "
+            f"'{args.root}'. A later run would scan this run's generated files. "
+            "Write output elsewhere with --out <dir outside the target>.",
             file=sys.stderr,
         )
 

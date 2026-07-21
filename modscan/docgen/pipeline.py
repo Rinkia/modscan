@@ -41,6 +41,7 @@ from modscan.docgen.types import DocReport, DroppedPoint, GeneratedPoint
 from modscan.factblocks import build_fact_block, build_module_index, render_fact_block
 from modscan.graph import build_graph
 from modscan.languages import get_language_parser
+from modscan.execution import preserve_sys_modules
 from modscan.models import Codebase, ExampleStatus, ExtensionPoint
 from modscan.preflight import PreflightError, probe_target
 from modscan.prompts import SYSTEM, architecture_prompt, example_prompt, guide_prompt
@@ -143,24 +144,6 @@ def generate_docs(
 
     runtime_validated = getattr(parser, "validates", language == "python")
 
-    # Fail fast if the target cannot be imported at all — otherwise every example
-    # fails to load and the run spends LLM calls producing empty docs. Only probe
-    # when we would execute target code anyway (validation enabled); it never adds
-    # an execution path the caller has not already consented to.
-    if runtime_validated and validate_examples:
-        result = probe_target(codebase, root)
-        if not result.ok:
-            raise PreflightError(result)
-
-    facts, dropped = _collect_facts(codebase, points, root, runtime_validated, limit)
-
-    overview = provider.generate(
-        SYSTEM,
-        architecture_prompt(
-            [render_fact_block(f) for f in facts], _dependency_summary(graph.dependencies)
-        ),
-    )
-
     ext = render.example_ext(language)
     # In-process validation mutates sys.path/sys.modules, so it is serialised
     # across workers; the LLM calls (the actual bottleneck) still overlap.
@@ -183,12 +166,35 @@ def generate_docs(
             example_path=render.example_path(fb.point_id, ext),
         )
 
-    if concurrency > 1 and len(facts) > 1:
-        with ThreadPoolExecutor(max_workers=concurrency) as pool:
-            # `map` yields in input order, so output is identical to serial.
-            generated = list(pool.map(build, facts))
-    else:
-        generated = [build(fb) for fb in facts]
+    # Everything that imports target code runs inside preserve_sys_modules, so the
+    # target's modules do not leak into the next run in the same process — two
+    # consecutive runs against different trees stay independent.
+    with preserve_sys_modules():
+        # Fail fast if the target cannot be imported at all — otherwise every
+        # example fails to load and the run spends LLM calls producing empty docs.
+        # Only probe when we would execute target code anyway (validation
+        # enabled); it never adds an execution path the caller has not consented to.
+        if runtime_validated and validate_examples:
+            result = probe_target(codebase, root)
+            if not result.ok:
+                raise PreflightError(result)
+
+        facts, dropped = _collect_facts(codebase, points, root, runtime_validated, limit)
+
+        overview = provider.generate(
+            SYSTEM,
+            architecture_prompt(
+                [render_fact_block(f) for f in facts],
+                _dependency_summary(graph.dependencies),
+            ),
+        )
+
+        if concurrency > 1 and len(facts) > 1:
+            with ThreadPoolExecutor(max_workers=concurrency) as pool:
+                # `map` yields in input order, so output is identical to serial.
+                generated = list(pool.map(build, facts))
+        else:
+            generated = [build(fb) for fb in facts]
 
     manifest_path = render.write_outputs(out_dir, root, overview, generated, dropped)
     return DocReport(

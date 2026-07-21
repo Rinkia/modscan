@@ -126,6 +126,34 @@ Wrong in both directions, measured:
 The signal rewards internal hierarchies and punishes user-facing API, which is
 backwards for this purpose.
 
+### Rejected: a "third discriminator" for SQLAlchemy's last three labels
+
+After the override-point signal, SQLAlchemy sits at 1/5: `Dialect` reaches the
+top ten, and `FunctionElement`, `ExecutableDDLElement`, `UserDefinedType` stay
+buried. A spike measured three cheap, generic candidates for lifting them —
+**none was adopted**:
+
+- **Docstring says "subclass / implement / override / custom / extend".** Catches
+  `UserDefinedType` (the rank-1640 outlier) but fires on 130 of SQLAlchemy's
+  1705 classes. Added as a weight it **regresses** the benchmark 8/12 → 6/12:
+  boosting all 130 buries the labels among them and even overtakes a click label.
+- **Extend-docstring AND ≥2 bases** (a selective combination). Neutral — 8/12 at
+  every weight, no target moved. No reason to add a signal that changes nothing.
+- **≥2 bases alone.** Catches none of the labels.
+
+The two truly-buried seams (`FunctionElement`, `ExecutableDDLElement`) extend by
+subclass **and `@compiles` compiler registration**, not by any property visible
+in a single class's own structure. Separating them from the hundreds of other
+documented multi-base classes needs whole-program subclass resolution the parser
+does not have — out of scope for a heuristic. `UserDefinedType` could be lifted
+off the floor by broadening re-export to module-level exports (it lives in
+`sqlalchemy/types.py`, a module, not a package `__init__`), but that alone does
+not reach the top ten.
+
+So SQLAlchemy stays at 1/5 and the aggregate at 8/12. This is recorded, not
+hidden: the honest ceiling of structural heuristics on a package whose real
+extension contract lives in its compiler registry and its prose.
+
 ### At risk: penalising private module paths
 
 *"Seams in `_private` modules are internal, so demote them."* Superficially

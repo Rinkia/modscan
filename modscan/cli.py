@@ -33,6 +33,7 @@ from modscan.diff import diff_manifests, render_diff_markdown
 from modscan.docgen import generate_docs
 from modscan.graph import build_graph
 from modscan.languages import get_language_parser
+from modscan.preflight import PreflightError
 from modscan.providers import (
     BudgetExceeded,
     BudgetProvider,
@@ -376,6 +377,11 @@ def main(argv: list[str] | None = None) -> int:
         if args.max_calls is not None:
             provider = BudgetProvider(provider, args.max_calls)
         return run(args, provider)
+    except PreflightError as exc:
+        # Target could not be imported — stop before spending anything, and tell
+        # the user why and how to fix it.
+        print(f"error: {exc}", file=sys.stderr)
+        return 4
     except BudgetExceeded as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 3

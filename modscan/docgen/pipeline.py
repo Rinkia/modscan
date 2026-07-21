@@ -42,6 +42,7 @@ from modscan.factblocks import build_fact_block, build_module_index, render_fact
 from modscan.graph import build_graph
 from modscan.languages import get_language_parser
 from modscan.models import Codebase, ExampleStatus, ExtensionPoint
+from modscan.preflight import PreflightError, probe_target
 from modscan.prompts import SYSTEM, architecture_prompt, example_prompt, guide_prompt
 from modscan.providers.base import Provider
 from modscan.validator import validate_points
@@ -120,6 +121,16 @@ def generate_docs(
     points = detect_extension_points(graph, min_score=min_score)
 
     runtime_validated = getattr(parser, "validates", language == "python")
+
+    # Fail fast if the target cannot be imported at all — otherwise every example
+    # fails to load and the run spends LLM calls producing empty docs. Only probe
+    # when we would execute target code anyway (validation enabled); it never adds
+    # an execution path the caller has not already consented to.
+    if runtime_validated and validate_examples:
+        result = probe_target(codebase, root)
+        if not result.ok:
+            raise PreflightError(result)
+
     facts = _collect_facts(codebase, points, root, runtime_validated, limit)
 
     overview = provider.generate(

@@ -148,7 +148,7 @@ untrusted PRs, since `detect` runs no LLM and executes no target code:
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: Rinkia/modscan@v0.1.0
+- uses: Rinkia/modscan@v0.1.1
   with:
     path: .
     min-score: "0.5"

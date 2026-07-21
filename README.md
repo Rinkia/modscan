@@ -151,6 +151,21 @@ untrusted PRs, since `detect` runs no LLM and executes no target code:
     min-score: "0.5"
 ```
 
+### From an AI client (MCP server)
+
+Ask an MCP-capable client (Claude Desktop, Cursor, …) "what are the extension
+points of this codebase?" without leaving the conversation. The server exposes
+only the offline detector — no LLM, no code execution — so it is safe on any
+local checkout.
+
+```bash
+pip install modscan[mcp]
+modscan-mcp        # stdio server; register the `modscan-mcp` command with your client
+```
+
+The one tool, `detect_extension_points_tool`, takes a path and returns the ranked
+points. *(Requires modscan ≥ 0.1.1.)*
+
 ## Full documentation run (uses an LLM)
 
 ```bash

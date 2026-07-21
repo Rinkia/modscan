@@ -7,8 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-21
+
 ### Added
 
+- **`modscan detect`** — rank a codebase's extension points using static analysis
+  only: no LLM, no API key, no code execution. Emits a Markdown table or `--json`.
+  The fast way to try MODScan and the safe way to run it in CI. Mirrors the other
+  no-LLM subcommands (`config`/`diff`/`scaffold`).
+- **GitHub Action** (`action.yml`) — runs `detect` and writes the ranked
+  extension points to a pull request's job summary. Safe on untrusted PRs (no
+  LLM, no target-code execution).
+- **MCP server** (`modscan[mcp]`, `modscan-mcp`) — exposes the offline detector
+  as a tool for AI clients (Claude Desktop, Cursor). Reuses the exact `detect`
+  path, so CLI and MCP cannot diverge.
+- **Extension-point ranking benchmark** (`benchmarks/`) — a labelled ground truth
+  over five real packages with a `score.py` reporting recall@10 and median rank,
+  offline. A CI guard blocks any PR that edits both the labels and the ranking
+  code in the same change.
 - **Spend controls for LLM runs.** `--max-tokens` caps tokens generated per
   call, and `--max-calls` sets a hard ceiling on calls for the whole run,
   refusing to send call N+1 rather than silently producing a truncated
@@ -18,8 +34,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the worst-case call count, requires `--yes` before spending, and caps itself
   at its own estimate.
 
+### Changed
+
+- **Re-export and override-point ranking signals**, each judged on the benchmark:
+  re-exported public API and classes with an override point (a method raising
+  `NotImplementedError`) now rank higher. Aggregate recall@10 rose from 4/12 to
+  8/12 on the original three targets; see `benchmarks/README.md` for the measured
+  before/after and the honest generalisation gaps on pygments and marshmallow.
+
 ### Fixed
 
+- **Builtin `__import__` is no longer ranked as a plugin loader.** It is a
+  general-purpose reflection / lazy-import primitive, not a plugin-discovery
+  mechanism, and was flooding the top of the ranking on packages that lazy-load
+  their own submodules. Still detected; scored as weak reflection evidence.
 - **The OpenAI-compatible and Gemini adapters sent no token limit at all**, so a
   runaway response was unbounded. Every adapter now applies `DEFAULT_MAX_TOKENS`
   (4096) unless told otherwise; previously only the Anthropic one did.
@@ -137,6 +165,7 @@ Initial MVP: the full pipeline, end to end.
   skeletons from the manifest.
 - Apache-2.0 licensing.
 
-[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Rinkia/modscan/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rinkia/modscan/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/Rinkia/modscan/releases/tag/v0.0.1

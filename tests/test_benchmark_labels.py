@@ -47,6 +47,11 @@ KNOWN_FALSE_POSITIVES = {
     "sqlalchemy.testing.fixtures.base:TestBase",
     "pluggy._callers:run_old_style_hookwrapper",
     "pluggy._hooks:normalize_hookimpl_opts",
+    # pygments' plugin-loading machinery ranks at the very top; a user registers a
+    # plugin via entry points, they never implement this call site.
+    "pygments.formatters:__import__",
+    # marshmallow's schema metaclass ranks high but is pure internal machinery.
+    "marshmallow.schema:SchemaMeta",
 }
 
 # Seams MODScan currently MISSES entirely. The labels must contain them —
@@ -55,6 +60,10 @@ MUST_BE_LABELLED = {
     "pluggy._manager:PluginManager",
     "pluggy._hooks:HookimplMarker",
     "sqlalchemy.sql.type_api:TypeDecorator",
+    # pygments' canonical seam, currently mid-ranked — must be present.
+    "pygments.lexer:Lexer",
+    # marshmallow's custom-field base, currently missed at rank ~28.
+    "marshmallow.fields:Field",
 }
 
 

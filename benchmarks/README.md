@@ -146,6 +146,28 @@ PRD's top risk named, now measured instead of feared. No weight was changed to
 hide it: fixing these is a future, separately-measured signal (a plugin-registry
 discount, or a broader "documented override" detector), not a quiet re-tune.
 
+### Correctness fix: `__import__` is reflection, not a plugin loader
+
+The pygments measurement above exposed a categorisation bug, now fixed. The
+detector scored every dynamic-import site at 0.9 as a `plugin_loader`, but the
+builtin `__import__` is a general-purpose reflection / lazy-import primitive —
+pygments uses it to lazy-load its own lexer modules, and five such shims flooded
+the top of its ranking. It is now scored as weak reflection evidence (still
+detected, just no longer ranked as a top extension point); `entry_points`,
+`import_string` and the other genuine plugin-discovery loaders are unchanged.
+
+This is **recall-neutral by construction** — no labelled extension point is a
+dynamic-import seam, so recall@10 stayed 9/20 across all five targets, with no
+regression. The gain is in the *output*: no package's ranking now leads with
+`__import__` machinery. (Medians drifted up slightly everywhere as the shims
+left the ordering.)
+
+**Deferred, recorded honestly**: after this fix pygments' top three are still
+`entry_points` sites. Those are the framework's own plugin-*discovery* code, not
+a symbol a user implements — but `entry_points` genuinely *is* a plugin
+mechanism, so whether such loader sites should rank as "implement-this" extension
+points at all is a larger question, left for a separate, measured change.
+
 ## Hypotheses this benchmark has already killed
 
 Recorded so nobody spends a weekend re-deriving them.

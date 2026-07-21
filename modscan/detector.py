@@ -87,6 +87,18 @@ def _registration_decorator(decorators: str) -> str | None:
 
 
 def _score_dynamic_import(seam: Seam) -> ExtensionPoint:
+    # The builtin __import__ is a general-purpose reflection / lazy-import
+    # primitive, not a plugin-discovery mechanism like entry_points or
+    # import_string. Ranking it as a top plugin_loader floods the output of any
+    # package that lazy-loads its own submodules (e.g. pygments' lexer registry).
+    # It stays detected — only its score drops to weak, ambiguous evidence.
+    if seam.name == "__import__":
+        return ExtensionPoint(
+            seam=seam,
+            category="reflection",
+            score=_W_PUBLIC_BASELINE,
+            signals=("builtin __import__ — reflection/lazy import, not a plugin mechanism",),
+        )
     return ExtensionPoint(
         seam=seam,
         category="plugin_loader",

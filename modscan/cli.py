@@ -183,22 +183,55 @@ def _main_diff(argv: list[str]) -> int:
     return 1 if diff.breaking else 0
 
 
-def _render_detect_markdown(points: list, root: str) -> str:
+def _split_detect_points(points: list) -> tuple[list, list]:
+    """Separate implement-this seams from plugin-registration (loader) seams.
+
+    Plugin-registration seams (entry_points and friends) are how a framework
+    *discovers* plugins — you register against them, you do not subclass them.
+    Kept apart so they do not flood the ranking of seams a user implements.
+    """
+    implement = [p for p in points if p.category != "plugin_loader"]
+    registration = [p for p in points if p.category == "plugin_loader"]
+    return implement, registration
+
+
+def _render_detect_markdown(implement: list, registration: list, root: str) -> str:
     lines = [
         f"# Extension points in `{root}`",
         "",
-        f"{len(points)} candidate(s), ranked by moddability. No LLM was used — "
+        f"{len(implement)} candidate(s), ranked by moddability. No LLM was used — "
         "this is the static ranking only.",
         "",
         "| # | Extension point | Category | Score | Why |",
         "|---|---|---|---|---|",
     ]
-    for i, p in enumerate(points, 1):
+    for i, p in enumerate(implement, 1):
         module = p.seam.module or root
         why = "; ".join(p.signals)
         lines.append(
             f"| {i} | `{module}:{p.seam.name}` | {p.category} | {p.score:.2f} | {why} |"
         )
+
+    if registration:
+        # Collapse identical (module, kind) call-sites: a reader needs "this
+        # package loads plugins via entry points" once, not one row per call.
+        seen: dict[tuple[str, str], int] = {}
+        for p in registration:
+            key = (p.seam.module or root, p.seam.name)
+            seen[key] = seen.get(key, 0) + 1
+        lines += [
+            "",
+            "## Plugin registration points",
+            "",
+            "How this package discovers plugins — register against these rather "
+            "than subclassing them.",
+            "",
+            "| Mechanism | Location | Call sites |",
+            "|---|---|---|",
+        ]
+        for (module, name), count in seen.items():
+            lines.append(f"| `{name}` | `{module}` | {count} |")
+
     return "\n".join(lines)
 
 
@@ -231,8 +264,11 @@ def _main_detect(argv: list[str]) -> int:
 
     codebase = get_language_parser(args.language).parse_codebase(args.root)
     points = detect_extension_points(build_graph(codebase), min_score=args.min_score)
+    implement, registration = _split_detect_points(points)
+    # --limit caps the ranked implement-this list; registration points are a
+    # small deduplicated set, always shown in full.
     if args.limit is not None:
-        points = points[: args.limit]
+        implement = implement[: args.limit]
 
     # Signal strings contain an em-dash; a Windows cp1252 console would raise
     # UnicodeEncodeError printing them. Emit UTF-8 regardless of console locale.
@@ -248,11 +284,11 @@ def _main_detect(argv: list[str]) -> int:
                 "kind": p.seam.kind,
                 "signals": list(p.signals),
             }
-            for p in points
+            for p in implement + registration
         ]
         print(json.dumps(payload, indent=2))
     else:
-        print(_render_detect_markdown(points, args.root))
+        print(_render_detect_markdown(implement, registration, args.root))
     return 0
 
 

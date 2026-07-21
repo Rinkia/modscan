@@ -1,0 +1,82 @@
+{
+  "generated_by": "modscan",
+  "points": [
+    {
+      "bases": [],
+      "category": "hook",
+      "decorators": [],
+      "example": {
+        "path": "examples/click_decorators_confirmation_option.py",
+        "status": "executed"
+      },
+      "id": "click.decorators:confirmation_option",
+      "implement": [],
+      "kind": "function",
+      "location": "click.decorators:380",
+      "module": "click.decorators",
+      "signals": [
+        "public function",
+        "name matches hook/registration pattern ('on_')",
+        "re-exported from the package's public entry point"
+      ],
+      "signature": "def confirmation_option()",
+      "symbol": "confirmation_option",
+      "validation": {
+        "method": "importable_callable"
+      }
+    },
+    {
+      "bases": [],
+      "category": "hook",
+      "decorators": [],
+      "example": {
+        "path": "examples/click_decorators_version_option.py",
+        "status": "executed"
+      },
+      "id": "click.decorators:version_option",
+      "implement": [],
+      "kind": "function",
+      "location": "click.decorators:421",
+      "module": "click.decorators",
+      "signals": [
+        "public function",
+        "name matches hook/registration pattern ('on_')",
+        "re-exported from the package's public entry point"
+      ],
+      "signature": "def version_option(version)",
+      "symbol": "version_option",
+      "validation": {
+        "method": "importable_callable"
+      }
+    },
+    {
+      "bases": [
+        "",
+        "abc.ABC"
+      ],
+      "category": "subclass",
+      "decorators": [],
+      "example": {
+        "path": "examples/click_types_ParamType.py",
+        "status": "verified"
+      },
+      "id": "click.types:ParamType",
+      "implement": [],
+      "kind": "abstract_class",
+      "location": "click.types:42",
+      "module": "click.types",
+      "signals": [
+        "public class",
+        "abstract (ABC / @abstractmethod) — meant to be subclassed",
+        "re-exported from the package's public entry point"
+      ],
+      "signature": "class ParamType(, abc.ABC)",
+      "symbol": "ParamType",
+      "validation": {
+        "method": "subclass_instantiation"
+      }
+    }
+  ],
+  "schema_version": "1.0",
+  "target_root": "C:\\Users\\STEFAN~1.RIZ\\AppData\\Local\\Temp\\modscan-showcase-dwynueeb"
+}

@@ -54,3 +54,19 @@ Large applications (Home Assistant, Django) need more care:
   of candidate points and a matching API bill.
 - **Write output outside the scanned tree**, or the next run will scan the
   examples the previous one generated.
+
+## Committed example: `showcase-click/`
+
+A real MODScan run against click 8.4.2 (`--limit 4`), committed so you can see
+what it produces without spending anything. It is an honest sample, not a
+cherry-picked one:
+
+- **`ParamType`** is documented with a **verified** example — the generated
+  `MyParamType(ParamType)` subclass was executed and loaded successfully. This is
+  the seam a real click user extends, and MODScan both found it and produced
+  working code for it.
+- Two decorator hooks (`confirmation_option`, `version_option`) are documented
+  with generated examples.
+- **`Parameter` (ranked #1) does not appear**: its example failed validation, so
+  it was dropped rather than documented on faith. MODScan documents what it can
+  prove — a thinner but honest result is the design.

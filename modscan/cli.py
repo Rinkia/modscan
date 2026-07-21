@@ -28,8 +28,11 @@ import sys
 import json
 
 from modscan.config_scan import find_config_points, render_config_markdown
+from modscan.detector import detect_extension_points
 from modscan.diff import diff_manifests, render_diff_markdown
 from modscan.docgen import generate_docs
+from modscan.graph import build_graph
+from modscan.languages import get_language_parser
 from modscan.providers import (
     BudgetExceeded,
     BudgetProvider,
@@ -180,6 +183,79 @@ def _main_diff(argv: list[str]) -> int:
     return 1 if diff.breaking else 0
 
 
+def _render_detect_markdown(points: list, root: str) -> str:
+    lines = [
+        f"# Extension points in `{root}`",
+        "",
+        f"{len(points)} candidate(s), ranked by moddability. No LLM was used — "
+        "this is the static ranking only.",
+        "",
+        "| # | Extension point | Category | Score | Why |",
+        "|---|---|---|---|---|",
+    ]
+    for i, p in enumerate(points, 1):
+        module = p.seam.module or root
+        why = "; ".join(p.signals)
+        lines.append(
+            f"| {i} | `{module}:{p.seam.name}` | {p.category} | {p.score:.2f} | {why} |"
+        )
+    return "\n".join(lines)
+
+
+def _main_detect(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="modscan detect",
+        description="List a codebase's ranked extension points. No LLM, no API "
+        "key, no code execution — pure static analysis. The fast way to see what "
+        "MODScan finds before committing to a full documentation run.",
+    )
+    parser.add_argument("root", help="path to the codebase to scan")
+    parser.add_argument(
+        "--language",
+        default="python",
+        help="source language: python (default) | typescript | javascript",
+    )
+    parser.add_argument(
+        "--min-score", type=float, default=0.0, help="min moddability score (default: 0.0)"
+    )
+    parser.add_argument(
+        "--limit", type=int, default=None, help="show only the top N points"
+    )
+    parser.add_argument(
+        "--json", action="store_true", help="emit JSON instead of a Markdown table"
+    )
+    args = parser.parse_args(argv)
+    if not os.path.isdir(args.root):
+        print(f"error: not a directory: {args.root}", file=sys.stderr)
+        return 2
+
+    codebase = get_language_parser(args.language).parse_codebase(args.root)
+    points = detect_extension_points(build_graph(codebase), min_score=args.min_score)
+    if args.limit is not None:
+        points = points[: args.limit]
+
+    # Signal strings contain an em-dash; a Windows cp1252 console would raise
+    # UnicodeEncodeError printing them. Emit UTF-8 regardless of console locale.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+    if args.json:
+        payload = [
+            {
+                "id": f"{p.seam.module or args.root}:{p.seam.name}",
+                "category": p.category,
+                "score": round(p.score, 4),
+                "kind": p.seam.kind,
+                "signals": list(p.signals),
+            }
+            for p in points
+        ]
+        print(json.dumps(payload, indent=2))
+    else:
+        print(_render_detect_markdown(points, args.root))
+    return 0
+
+
 def _main_config(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="modscan config",
@@ -199,6 +275,7 @@ def _main_config(argv: list[str]) -> int:
 # a single entry here plus its handler — previously it meant editing three
 # places in main().
 _SUBCOMMANDS = {
+    "detect": _main_detect,
     "scaffold": _main_scaffold,
     "diff": _main_diff,
     "config": _main_config,

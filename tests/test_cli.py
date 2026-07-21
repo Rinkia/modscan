@@ -88,8 +88,41 @@ def test_main_bad_root() -> None:
     assert main(["C:/no/such/dir/modscan-xyz"]) == 2
 
 
+def test_detect_subcommand_no_llm() -> None:
+    """`modscan detect` ranks extension points offline — no provider, no network."""
+    import io
+    from contextlib import redirect_stdout
+
+    pkg = "clidetect"
+    with tempfile.TemporaryDirectory() as root:
+        _write_pkg(root, pkg)
+        try:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                code = main(["detect", root, "--min-score", "0.3"])
+            out = buf.getvalue()
+            assert code == 0
+            assert "Sink" in out, out  # the abstract base is surfaced
+            assert "Extension points" in out
+
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                code = main(["detect", root, "--json"])
+            assert code == 0
+            payload = __import__("json").loads(buf.getvalue())
+            assert any(p["id"].endswith(":Sink") for p in payload), payload
+        finally:
+            _cleanup(pkg)
+
+
+def test_detect_bad_root() -> None:
+    assert main(["detect", "C:/no/such/dir/modscan-xyz"]) == 2
+
+
 if __name__ == "__main__":
     test_parser_defaults()
     test_run_with_fake_provider()
     test_main_bad_root()
+    test_detect_subcommand_no_llm()
+    test_detect_bad_root()
     print("OK: cli self-check passed")

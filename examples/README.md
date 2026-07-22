@@ -70,3 +70,39 @@ cherry-picked one:
 - **`Parameter` (ranked #1) does not appear**: its example failed validation, so
   it was dropped rather than documented on faith. MODScan documents what it can
   prove — a thinner but honest result is the design.
+
+## Committed example: `detect-markdown.md` (free, no API key)
+
+[`detect-markdown.md`](detect-markdown.md) is a real `modscan detect` run against
+Python-Markdown 3.10.2 — static analysis only, no LLM, no API key. It is the free
+counterpart to the click showcase above: nothing to spend, instant to reproduce,
+on a package with a large third-party extension community.
+
+Honest reading, not cherry-picked:
+
+- MODScan locks onto markdown's **extension surface**: the top rows are all
+  `*Extension` classes. But those are the built-in *implementations*; the base
+  `Extension` and the processor bases a plugin author actually subclasses
+  (`Treeprocessor`, `BlockProcessor`, …) rank lower — the same generalisation gap
+  measured in [`../benchmarks/README.md`](../benchmarks/README.md).
+- The **Plugin registration points** section shows how markdown discovers plugins
+  (`entry_points`, plus `import_module`/`find_spec` loader sites), reported apart
+  from the implement-this ranking rather than flooding it.
+
+Reproduce it (free):
+
+```bash
+pip install markdown==3.10.2
+# fully-qualified ids (markdown.*) need the package under a parent dir, as a real
+# checkout has it — copy it into an empty dir, then scan that:
+python - <<'PY'
+import os, importlib, shutil, tempfile, subprocess
+md = os.path.dirname(importlib.import_module("markdown").__file__)
+tmp = tempfile.mkdtemp(); shutil.copytree(md, os.path.join(tmp, "markdown"))
+subprocess.run(["modscan", "detect", tmp, "--min-score", "0.5",
+                "--limit", "12", "--label", "markdown 3.10.2"])
+PY
+```
+
+`--label` keeps the local scan path out of the output, so the committed file is
+exactly what the command prints.

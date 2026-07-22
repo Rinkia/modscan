@@ -119,6 +119,27 @@ def test_detect_bad_root() -> None:
     assert main(["detect", "C:/no/such/dir/modscan-xyz"]) == 2
 
 
+def test_detect_label_replaces_scan_path_in_header() -> None:
+    """--label puts a clean name in the header instead of the scan path, so
+    committed or shared output leaks no local filesystem path."""
+    import io
+    from contextlib import redirect_stdout
+
+    pkg = "clilabel"
+    with tempfile.TemporaryDirectory() as root:
+        _write_pkg(root, pkg)
+        try:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                code = main(["detect", root, "--label", "clilabel 9.9.9"])
+            out = buf.getvalue()
+            assert code == 0
+            assert "# Extension points in `clilabel 9.9.9`" in out
+            assert root not in out, "the scan path must not appear when --label is set"
+        finally:
+            _cleanup(pkg)
+
+
 def test_run_fails_fast_on_missing_dependency() -> None:
     """A target whose deps aren't installed stops before any LLM call, with a
     classified cause — not empty docs."""
@@ -290,6 +311,7 @@ if __name__ == "__main__":
     test_main_bad_root()
     test_detect_subcommand_no_llm()
     test_detect_bad_root()
+    test_detect_label_replaces_scan_path_in_header()
     test_detect_separates_and_dedups_registration_points()
     test_run_fails_fast_on_missing_dependency()
     test_dropped_points_are_classified_and_reported()

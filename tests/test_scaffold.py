@@ -23,7 +23,14 @@ import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from modscan.scaffold import find_point, render_scaffold, scaffold, scaffold_all  # noqa: E402
+from modscan.scaffold import (  # noqa: E402
+    find_point,
+    render_scaffold,
+    scaffold,
+    scaffold_all,
+    verify_all,
+    verify_point,
+)
 from modscan.cli import main  # noqa: E402
 
 MANIFEST = {
@@ -134,6 +141,79 @@ def test_cli_scaffold_all_and_missing_id() -> None:
         assert main(["scaffold", "--manifest", manifest_path]) == 2
 
 
+# --- verification -----------------------------------------------------------
+# A real importable target: a package whose base actually imports and subclasses,
+# so verification exercises the validator end-to-end (no LLM, fully offline).
+
+_FIXTURE_API = '''\
+from abc import ABC, abstractmethod
+
+
+class Exporter(ABC):
+    @abstractmethod
+    def export(self, data, fmt): ...
+
+    @abstractmethod
+    def name(self): ...
+
+
+def register(fn):
+    return fn
+'''
+
+
+def _write_fixture_target(root: str) -> dict:
+    """Create pkg/api.py under `root` and return a manifest pointed at it."""
+    os.makedirs(os.path.join(root, "pkg"), exist_ok=True)
+    open(os.path.join(root, "pkg", "__init__.py"), "w").close()
+    with open(os.path.join(root, "pkg", "api.py"), "w", encoding="utf-8") as fh:
+        fh.write(_FIXTURE_API)
+    manifest = json.loads(json.dumps(MANIFEST))  # deep copy
+    manifest["target_root"] = root
+    for p in manifest["points"]:
+        p["location"] = f"{p['module']}:1"
+    return manifest
+
+
+def test_verify_all_passes_on_real_target() -> None:
+    with tempfile.TemporaryDirectory() as root:
+        manifest = _write_fixture_target(root)
+        results = verify_all(manifest)
+        assert len(results) == 2
+        assert all(r.ok for r in results), [(r.method, r.detail) for r in results]
+        methods = {r.point.seam.name: r.method for r in results}
+        assert methods["Exporter"] == "subclass_instantiation"
+        assert methods["register"] == "importable_callable"
+
+
+def test_verify_point_fails_on_missing_symbol() -> None:
+    with tempfile.TemporaryDirectory() as root:
+        manifest = _write_fixture_target(root)
+        # point at a symbol that does not exist in the target
+        manifest["points"][0]["symbol"] = "DoesNotExist"
+        result = verify_point(manifest, "pkg.api:Exporter")
+        assert not result.ok
+        assert result.method == "error"
+        assert "import failed" in result.detail
+
+
+def test_cli_scaffold_verify_exit_codes() -> None:
+    with tempfile.TemporaryDirectory() as root:
+        manifest = _write_fixture_target(root)
+        manifest_path = os.path.join(root, "extension-points.json")
+        with open(manifest_path, "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh)
+        out = os.path.join(root, "out")
+        # verify a good target -> exit 0
+        assert main(["scaffold", "--all", "--manifest", manifest_path, "--out", out, "--verify"]) == 0
+
+        # break one point -> verify exits 1
+        manifest["points"][0]["symbol"] = "DoesNotExist"
+        with open(manifest_path, "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh)
+        assert main(["scaffold", "--all", "--manifest", manifest_path, "--out", out, "--verify"]) == 1
+
+
 if __name__ == "__main__":
     test_render_subclass_is_valid_python()
     test_render_template_for_function()
@@ -142,4 +222,7 @@ if __name__ == "__main__":
     test_cli_scaffold_subcommand()
     test_scaffold_all_writes_every_point()
     test_cli_scaffold_all_and_missing_id()
+    test_verify_all_passes_on_real_target()
+    test_verify_point_fails_on_missing_symbol()
+    test_cli_scaffold_verify_exit_codes()
     print("OK: scaffold self-check passed")

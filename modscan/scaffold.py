@@ -26,6 +26,8 @@ import json
 import os
 
 from modscan.fsutil import slugify
+from modscan.models import ExtensionPoint, Seam
+from modscan.validator import ValidationResult, validate_point
 
 
 def load_manifest(path: str) -> dict:
@@ -121,3 +123,48 @@ def scaffold_all(manifest_path: str, out_dir: str = ".") -> list[str]:
     manifest = load_manifest(manifest_path)
     points = sorted(manifest.get("points", []), key=lambda p: p.get("id", ""))
     return [_write_point(point, out_dir) for point in points]
+
+
+# --- verification -----------------------------------------------------------
+# A scaffolded subclass is only a hypothesis until the base actually imports and
+# subclasses. Verification reuses the layer-5 validator: the base is loaded and a
+# probe subclass instantiated — exactly what the generated `My{Symbol}({Symbol})`
+# skeleton does — so a passing verification means the skeleton is sound.
+#
+# SECURITY / TRUST BOUNDARY: verification IMPORTS the target codebase, which runs
+# its module-level code. This is opt-in only (`scaffold --verify`); the default
+# scaffold path stays purely deterministic and never imports the target. Run it
+# only on code you trust. See modscan/validator.py for the full boundary note.
+
+
+def _point_from_entry(entry: dict) -> ExtensionPoint:
+    """Rebuild the minimal ExtensionPoint the validator needs from a manifest entry.
+
+    Only `seam.module`, `seam.name` and `category` are read by `validate_point`;
+    score/signals/detail are irrelevant to verification, so they are left empty.
+    """
+    location = entry.get("location", "")
+    try:
+        lineno = int(location.rsplit(":", 1)[1])
+    except (IndexError, ValueError):
+        lineno = 0
+    seam = Seam(
+        kind=entry.get("kind", ""),
+        module=entry.get("module", ""),
+        name=entry.get("symbol", ""),
+        lineno=lineno,
+    )
+    return ExtensionPoint(seam, entry.get("category", ""), 0.0, ())
+
+
+def verify_point(manifest: dict, point_id: str) -> ValidationResult:
+    """Verify one point by loading its base against the manifest's target_root."""
+    entry = find_point(manifest, point_id)
+    return validate_point(manifest.get("target_root", ""), _point_from_entry(entry))
+
+
+def verify_all(manifest: dict) -> list[ValidationResult]:
+    """Verify every point (sorted by id) against the manifest's target_root."""
+    root = manifest.get("target_root", "")
+    points = sorted(manifest.get("points", []), key=lambda p: p.get("id", ""))
+    return [validate_point(root, _point_from_entry(p)) for p in points]

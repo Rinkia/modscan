@@ -29,7 +29,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modscan.parser import parse_codebase  # noqa: E402
 from modscan.graph import build_graph  # noqa: E402
-from modscan.detector import detect_extension_points  # noqa: E402
+from modscan.detector import (  # noqa: E402
+    SIGNAL_CATALOG,
+    detect_extension_points,
+)
 from tests.test_parser import FIXTURE, _write_fixture  # noqa: E402
 
 
@@ -202,9 +205,37 @@ def test_import_builtin_scored_below_real_loaders() -> None:
     print("OK: __import__ reflection self-check passed")
 
 
+def test_signals_carry_stable_ids() -> None:
+    """Every moddability signal is tagged with a stable catalog ID (Bandit-style),
+    so a point's reasons are machine-referenceable. Presentation only — the IDs
+    do not change the score (covered by the ranking tests above)."""
+    # catalog integrity: all ids share the MS-MOD- namespace, none duplicated
+    assert all(sid.startswith("MS-MOD-") for sid in SIGNAL_CATALOG)
+    assert len(set(SIGNAL_CATALOG)) == len(SIGNAL_CATALOG)
+
+    with tempfile.TemporaryDirectory() as root:
+        pkg = os.path.join(root, "lib")
+        os.makedirs(pkg)
+        with open(os.path.join(pkg, "__init__.py"), "w", encoding="utf-8") as fh:
+            fh.write("from .api import Base\n")
+        with open(os.path.join(pkg, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write("from abc import ABC, abstractmethod\n\n\n"
+                     "class Base(ABC):\n    @abstractmethod\n    def run(self): ...\n")
+        points = detect_extension_points(build_graph(parse_codebase(root)))
+        base = next(p for p in points if p.seam.name == "Base")
+        # every reason on the point is prefixed with a bracketed catalog id
+        assert base.signals, "expected signals on the abstract base"
+        for reason in base.signals:
+            assert reason.startswith("[MS-MOD-"), reason
+        assert any("[MS-MOD-ABSTRACT]" in s for s in base.signals)
+        assert any("[MS-MOD-REEXPORT]" in s for s in base.signals)
+    print("OK: signal stable-id self-check passed")
+
+
 if __name__ == "__main__":
     test_detector_ranking()
     test_reexport_signal_lifts_a_floor_seam()
     test_reexport_fires_when_scanning_a_parent_directory()
     test_override_point_breaks_a_reexport_tie()
     test_import_builtin_scored_below_real_loaders()
+    test_signals_carry_stable_ids()

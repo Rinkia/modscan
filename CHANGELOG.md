@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-22
+
+Downstream polish: scaffolds you can verify, docs that point at them, and a gate
+comment that stops repeating itself.
+
 ### Changed
 
 - **The breaking-change gate now posts a sticky PR comment.** It finds its own
@@ -267,7 +272,8 @@ Initial MVP: the full pipeline, end to end.
   skeletons from the manifest.
 - Apache-2.0 licensing.
 
-[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/Rinkia/modscan/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Rinkia/modscan/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Rinkia/modscan/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rinkia/modscan/compare/v0.1.0...v0.1.1

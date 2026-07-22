@@ -193,8 +193,10 @@ jobs:
 ```
 
 On a PR it comments the diff and fails the check when an extension point is gone
-or its category/kind changed. A score/ranking change alone is not breaking.
-(MODScan uses this on itself — see `.github/workflows/extension-api-gate.yml`.)
+or its category/kind changed. A score/ranking change alone is not breaking. The
+comment is **sticky** — it updates in place on each re-push instead of stacking a
+new one. (MODScan uses this on itself — see
+`.github/workflows/extension-api-gate.yml`.)
 
 **See it work** — [`modscan-gate-example`](https://github.com/Rinkia/modscan-gate-example)
 is a live demo: a PR that [adds an extension point](https://github.com/Rinkia/modscan-gate-example/pull/1)

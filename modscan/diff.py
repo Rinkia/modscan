@@ -79,6 +79,12 @@ def diff_manifests(old: dict | list, new: dict | list) -> ManifestDiff:
     return ManifestDiff(removed=removed, added=added, changed=changed)
 
 
+# Hidden HTML marker on the first line so a CI gate can find its own prior PR
+# comment and update it in place instead of stacking a new one on every re-push.
+# Invisible in rendered Markdown; harmless in terminal output.
+DIFF_COMMENT_MARKER = "<!-- modscan-extension-point-diff -->"
+
+
 def render_diff_markdown(diff: ManifestDiff) -> str:
     """Render the diff as a short Markdown report (for CLI output or PR comments)."""
     verdict = (
@@ -86,7 +92,7 @@ def render_diff_markdown(diff: ManifestDiff) -> str:
         if diff.breaking
         else "No breaking changes to extension points"
     )
-    lines = ["## MODScan extension-point diff", "", verdict, ""]
+    lines = [DIFF_COMMENT_MARKER, "## MODScan extension-point diff", "", verdict, ""]
 
     if diff.removed:
         lines.append("### Removed (breaking)")

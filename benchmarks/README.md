@@ -213,6 +213,98 @@ So SQLAlchemy stays at 1/5 and the aggregate at 8/12. This is recorded, not
 hidden: the honest ceiling of structural heuristics on a package whose real
 extension contract lives in its compiler registry and its prose.
 
+The whole-program subclass/`@compiles` resolution floated here as the possible
+escape was later built and measured — see *"Rejected: whole-program subclass
+resolution"* below. It does not surface these seams: their `@compiles` edges live
+in downstream user code the scan never sees, and the buried labels have zero
+in-package subclasses.
+
+### Rejected: whole-program subclass resolution (and `@compiles`)
+
+*"The buried compiler-registration seams (`FunctionElement`, `ExecutableDDLElement`,
+`UserDefinedType`) can be lifted by resolving the whole-program subclass graph and
+the `@compiles` registration edges the parser doesn't currently see."* This was
+the last lever this file named — a research spike, not a clean task. **Measured,
+rejected.**
+
+Two structural findings end it, both from a single-package scan of the pinned
+targets:
+
+- **`@compiles` registration is invisible to the scan.** SQLAlchemy's own source
+  uses `@compiles(...)` to register compilers against *concrete* elements
+  (`greatest`, `utcnow`, `CreateColumn`, `InsertFromSelect`) and its docstring
+  examples (`MyColumn`, `SLBigInteger`) — **never** against the public bases.
+  Users register against `FunctionElement` / `ExecutableDDLElement` in *their own*
+  code, which MODScan never sees when scanning the library. Fourteen classes are
+  `@compiles` targets in-package; **none** is a labelled seam. The compiler-
+  registration contract the docs describe lives downstream of the scan boundary.
+- **The two truly-buried labels have zero in-package subclasses.**
+  `FunctionElement` (rank 266) and `UserDefinedType` (rank 1631) are subclassed
+  **zero** times inside SQLAlchemy and `@compiles`-registered zero times. No
+  subclass-count threshold can move a class with no subclasses.
+
+Wired as a weight anyway and swept, the whole-program subclass-count signal
+**regresses a target**, failing the standing accept bar (recall@10 up **and** no
+target regresses):
+
+| subclass weight | aggregate | sqlalchemy | pygments | marshmallow | click | pluggy |
+|---|---|---|---|---|---|---|
+| 0.0 (baseline) | 9/20 | 1/5 | 0/5 | 1/3 | 4/4 | 3/3 |
+| 0.5 | 11/20 | **0/5** | 2/5 | 2/3 | 4/4 | 3/3 |
+| 0.7 | 11/20 | **0/5** | 2/5 | 2/3 | 4/4 | 3/3 |
+
+Aggregate rises 9→11, but **SQLAlchemy regresses 1/5→0/5**: `Dialect` (rank 8)
+drops out of the top ten because ~500 of 1723 classes receive the same boost and
+re-bury it. This is the "ranking by internal subclass count" hypothesis —
+already rejected above as *wrong in both directions* — reconfirmed with a fresh
+number: the flood promotes real seams and non-seams alike, and the one SQLAlchemy
+label that worked is the casualty. The pygments/marshmallow gains are real but
+cannot be bought at the cost of a per-target regression, and the signal never
+touches the buried SQLAlchemy labels it was meant to lift.
+
+**Verdict**: the buried seams' extension contract is genuinely invisible to a
+static single-package scan — it lives in downstream user code and in prose. This
+is the honest ceiling of structural heuristics on this benchmark, now measured
+rather than suspected. The lever is closed; the benchmark stays at **9/20**. No
+detector weight was changed.
+
+#### Follow-up rejected: widen the scan to the package's own `test/` + `examples/`
+
+The natural rescue is *"the `@compiles` and subclass evidence lives in the
+package's own test suite and doc examples — so scan those too and apply the
+evidence to the library symbols."* Measured on SQLAlchemy's 2.0.51 source
+tarball (the installed wheel ships no tests). **Rejected — the evidence and the
+noise are the same directory.**
+
+Subclass demonstrations of the buried bases do appear once `test/` is scanned —
+`UserDefinedType` goes from 0 in-library subclasses to 30, `FunctionElement` to
+12. But `test/` is also SQLAlchemy's largest subclass farm, and its base classes
+are shipped *inside the library* under `sqlalchemy/testing/`:
+
+| Evidence source | UserDefinedType | FunctionElement | TypeDecorator | Top of the subclass ranking |
+|---|---|---|---|---|
+| lib + `test/` + examples + doc | 30 | 12 | 113 | `TestBase` 604, `MappedTest` 365, `TablesTest` 187, `AssertsCompiledSQL` 387 — ten test-infra / declarative-boilerplate classes rank above the first real label |
+| lib + examples + doc (no `test/`) | **0** | **0** | 6 | clean, but the label evidence has collapsed to nothing |
+
+The two rows bracket it. With `test/` the buried labels finally get real counts
+but sit behind ~10–20 test-infrastructure bases — the exact classes the
+labelling rule explicitly excludes (*"`TablesTest`, `TestBase` — widely
+subclassed, but not by the people MODScan serves"*) — so they still miss the top
+ten and the output is flooded with the test framework. Without `test/` the flood
+is gone but so is the signal: the demonstrations lived almost entirely in the
+tests. Filtering candidates defined under `*/testing/*` removes the flood
+*classes* but not the problem — the evidence that would lift the real labels is
+in the same files. There is no window where the buried-label evidence is strong
+and the test-infra noise is absent, because extension is demonstrated *by
+subclassing in the tests*, which is also what the fixtures do en masse.
+
+So widening the scan does not help. Three measured negatives now share one root
+cause: these seams' extensibility is expressed by subclassing-in-tests and
+registration-in-user-code, both statistically indistinguishable from noise (test
+fixtures, concrete elements) to any count-based signal. Ranking is at its honest
+ceiling on this benchmark; the way forward is **more targets**, not another
+weight on these five.
+
 ### At risk: penalising private module paths
 
 *"Seams in `_private` modules are internal, so demote them."* Superficially

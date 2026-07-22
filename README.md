@@ -196,6 +196,11 @@ On a PR it comments the diff and fails the check when an extension point is gone
 or its category/kind changed. A score/ranking change alone is not breaking.
 (MODScan uses this on itself — see `.github/workflows/extension-api-gate.yml`.)
 
+**See it work** — [`modscan-gate-example`](https://github.com/Rinkia/modscan-gate-example)
+is a live demo: a PR that [adds an extension point](https://github.com/Rinkia/modscan-gate-example/pull/1)
+passes with an *Added* comment, and one that [removes one](https://github.com/Rinkia/modscan-gate-example/pull/2)
+**fails** with a *Removed (breaking)* comment.
+
 ### From an AI client (MCP server)
 
 Ask an MCP-capable client (Claude Desktop, Cursor, …) "what are the extension

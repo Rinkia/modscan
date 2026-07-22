@@ -159,6 +159,22 @@ Point it at an installed package to see it work immediately:
 modscan detect "$(python -c 'import os,click;print(os.path.dirname(click.__file__))')" --limit 5
 ```
 
+### Security lens (`modscan-audit`)
+
+The same seams a plugin system exposes are also where untrusted code can enter. A
+sibling command maps that **attack surface** — `eval`/`exec`, `pickle`/`marshal`/
+`yaml` deserialization, `os.system`/`subprocess`, and dynamic loaders — ranked by
+**severity × confidence** (stable `MS-SEC-*` ids). Offline, no LLM:
+
+```bash
+modscan-audit ./path/to/project           # ranked Markdown report
+modscan-audit ./path/to/project --json    # machine-readable
+```
+
+It is **enumeration, not a vulnerability scan**: it shows where to look, it does
+not trace taint, match CVEs, or detect secrets — and an empty report is not a
+clean bill of health. It maps surface to review by hand.
+
 ### In CI (GitHub Action)
 
 Drop the ranked extension points into every pull request's job summary — safe on

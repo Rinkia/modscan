@@ -90,6 +90,13 @@ def test_docgen_verified() -> None:
             assert os.path.isfile(os.path.join(out, "index.md"))
             assert os.path.isfile(os.path.join(out, "plugin-guide.md"))
             assert os.path.isfile(os.path.join(out, gp.example_path))
+
+            # index carries the example-status legend; guide links to scaffold
+            index = open(os.path.join(out, "index.md"), encoding="utf-8").read()
+            guide = open(os.path.join(out, "plugin-guide.md"), encoding="utf-8").read()
+            assert "**Example status**" in index
+            assert "`verified` — example subclass executed" in index
+            assert f'`modscan scaffold "{pkg}.api:Backend"`' in guide
             manifest_path = os.path.join(out, "extension-points.json")
             assert os.path.isfile(manifest_path)
 

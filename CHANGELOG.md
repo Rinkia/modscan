@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Docs link to scaffolding, and explain the status badges.** The generated
+  plugin guide now prints the exact `modscan scaffold "<id>"` command for each
+  extension point, so a reader goes from documentation to a ready-to-edit
+  skeleton in one copy. The index carries an example-status legend explaining what
+  each badge (`verified`, `executed`, `compiled`, `generated`, `unverified`)
+  means. Deterministic — no LLM, no new prompts.
 - **`modscan scaffold --verify`** — after writing plugin skeletons, imports the
   target and confirms each base actually subclasses/instantiates (or, for
   hook/registration points, imports and is callable), reusing the layer-5

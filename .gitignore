@@ -26,3 +26,6 @@ modding-docs/
 
 # Local planning docs (kept out of the public repo)
 .claude/
+
+# Local scratchpad for throwaway spikes and analysis (never committed)
+scratchpad/

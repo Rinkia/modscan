@@ -268,6 +268,41 @@ def test_no_validate_examples_skips_preflight() -> None:
             _cleanup(pkg)
 
 
+def test_detect_root_package_symbol_has_no_path_in_id() -> None:
+    """A symbol in the root package (empty qualname) must render as
+    `basename:Symbol`, not `<abspath>:Symbol` — no local path leaks into Markdown
+    or JSON ids, and JSON marks it `module: null`."""
+    import io
+    from contextlib import redirect_stdout
+
+    # Files at the scan root itself (not nested) -> the root package's __init__
+    # symbols have an EMPTY qualname, which is what exercises the fallback.
+    # (_write_pkg nests a package and yields module == pkg, which does NOT.)
+    with tempfile.TemporaryDirectory() as root:
+        # Widget is DEFINED in __init__.py (the scan root), so its qualname is
+        # empty — the detector keys off where a symbol is defined, not where it
+        # is re-exported.
+        with open(os.path.join(root, "__init__.py"), "w", encoding="utf-8") as fh:
+            fh.write("__all__ = ['Widget']\nclass Widget:\n    def render(self): ...\n")
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            assert main(["detect", root, "--min-score", "0.0"]) == 0
+        md = buf.getvalue()
+        base = os.path.basename(os.path.normpath(root))
+        assert root not in md, "scan path must not appear in Markdown output"
+        # the root-package re-export symbol `Widget` (empty qualname) -> basename
+        assert f"`{base}:Widget`" in md, md
+
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            assert main(["detect", root, "--json"]) == 0
+        payload = __import__("json").loads(buf.getvalue())
+        assert root not in buf.getvalue(), "scan path must not appear in JSON"
+        widget = next(p for p in payload if p["id"] == f"{base}:Widget")
+        assert widget["module"] is None, widget
+
+
 def test_detect_separates_and_dedups_registration_points() -> None:
     """entry_points loader sites go in their own section, deduplicated, out of the
     implement-this ranking."""
@@ -312,6 +347,7 @@ if __name__ == "__main__":
     test_detect_subcommand_no_llm()
     test_detect_bad_root()
     test_detect_label_replaces_scan_path_in_header()
+    test_detect_root_package_symbol_has_no_path_in_id()
     test_detect_separates_and_dedups_registration_points()
     test_run_fails_fast_on_missing_dependency()
     test_dropped_points_are_classified_and_reported()

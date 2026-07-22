@@ -196,13 +196,21 @@ def _split_detect_points(points: list) -> tuple[list, list]:
     return implement, registration
 
 
+def _point_module(seam, root: str, label: str | None) -> str:
+    """Module qualname for output, or a clean fallback for a root-package symbol
+    (empty qualname): the label if set, else the scan root's basename — never the
+    absolute path, which would leak a local or CI filesystem layout into ids."""
+    return seam.module or label or os.path.basename(os.path.normpath(root))
+
+
 def _render_detect_markdown(
     implement: list, registration: list, root: str, label: str | None = None
 ) -> str:
-    # `label` overrides the header (which otherwise shows the scan path) so
-    # committed or shared output carries a clean name instead of a local path.
+    # Root-package symbols have an empty qualname; _point_module keeps their ids
+    # clean (label, else the root basename) instead of leaking the scan path.
+    header = label or os.path.basename(os.path.normpath(root))
     lines = [
-        f"# Extension points in `{label or root}`",
+        f"# Extension points in `{header}`",
         "",
         f"{len(implement)} candidate(s), ranked by moddability. No LLM was used — "
         "this is the static ranking only.",
@@ -211,7 +219,7 @@ def _render_detect_markdown(
         "|---|---|---|---|---|",
     ]
     for i, p in enumerate(implement, 1):
-        module = p.seam.module or root
+        module = _point_module(p.seam, root, label)
         why = "; ".join(p.signals)
         lines.append(
             f"| {i} | `{module}:{p.seam.name}` | {p.category} | {p.score:.2f} | {why} |"
@@ -222,7 +230,7 @@ def _render_detect_markdown(
         # package loads plugins via entry points" once, not one row per call.
         seen: dict[tuple[str, str], int] = {}
         for p in registration:
-            key = (p.seam.module or root, p.seam.name)
+            key = (_point_module(p.seam, root, label), p.seam.name)
             seen[key] = seen.get(key, 0) + 1
         lines += [
             "",
@@ -289,7 +297,8 @@ def _main_detect(argv: list[str]) -> int:
     if args.json:
         payload = [
             {
-                "id": f"{p.seam.module or args.root}:{p.seam.name}",
+                "id": f"{_point_module(p.seam, args.root, args.label)}:{p.seam.name}",
+                "module": p.seam.module or None,
                 "category": p.category,
                 "score": round(p.score, 4),
                 "kind": p.seam.kind,

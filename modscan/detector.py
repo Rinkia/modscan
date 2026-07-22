@@ -58,6 +58,44 @@ _REGISTRATION_DECORATOR_PARTS = (
     "register", "hook", "on_", "subscribe", "plugin", "command", "route", "listener",
 )
 
+# --- stable moddability signal IDs (Bandit-style catalog) --------------------
+# Each moddability signal carries a stable ID so a point's reasons are
+# machine-referenceable and stay comparable across versions — mirroring the
+# security lens's sink IDs (namespace MS-SEC-*). Presentation only: the ID never
+# affects the score or the ranking. Signals are a list per point, so the ID is
+# carried inline in the reason string (as Bandit shows its test ID inline),
+# rather than as a separate field.
+_SIG_DYNIMPORT = "MS-MOD-DYNIMPORT"
+_SIG_REFLECTION = "MS-MOD-REFLECTION"
+_SIG_ABSTRACT = "MS-MOD-ABSTRACT"
+_SIG_NAME_HOOK = "MS-MOD-NAMEHOOK"
+_SIG_CLASS_ROLE = "MS-MOD-CLASSROLE"
+_SIG_BASE_ROLE = "MS-MOD-BASEROLE"
+_SIG_REG_DECORATOR = "MS-MOD-REGDECO"
+_SIG_REEXPORT = "MS-MOD-REEXPORT"
+_SIG_OVERRIDE = "MS-MOD-OVERRIDE"
+_SIG_PUBLIC = "MS-MOD-PUBLIC"
+
+# One-line canonical meaning per ID — single source, covered by the self-check.
+SIGNAL_CATALOG: dict[str, str] = {
+    _SIG_DYNIMPORT: "runtime import — plugin-loading seam",
+    _SIG_REFLECTION: "builtin __import__ — reflection/lazy import, not a plugin mechanism",
+    _SIG_ABSTRACT: "abstract (ABC / @abstractmethod) — meant to be subclassed",
+    _SIG_NAME_HOOK: "function name matches a hook/registration pattern",
+    _SIG_CLASS_ROLE: "class name ends in a role-type suffix",
+    _SIG_BASE_ROLE: "subclasses a role-type base",
+    _SIG_REG_DECORATOR: "registration-style decorator",
+    _SIG_REEXPORT: "re-exported from the package's public entry point",
+    _SIG_OVERRIDE: "defines an override point (raises NotImplementedError)",
+    _SIG_PUBLIC: "public API baseline",
+}
+
+
+def _sig(sid: str, text: str) -> str:
+    """Prefix a signal reason with its stable ID (Bandit shows the test ID inline)."""
+    return f"[{sid}] {text}"
+
+
 _SCORE_MAX = 1.0
 
 
@@ -97,28 +135,30 @@ def _score_dynamic_import(seam: Seam) -> ExtensionPoint:
             seam=seam,
             category="reflection",
             score=_W_PUBLIC_BASELINE,
-            signals=("builtin __import__ — reflection/lazy import, not a plugin mechanism",),
+            signals=(_sig(_SIG_REFLECTION,
+                          "builtin __import__ — reflection/lazy import, not a plugin mechanism"),),
         )
     return ExtensionPoint(
         seam=seam,
         category="plugin_loader",
         score=_W_DYNAMIC_IMPORT,
-        signals=(f"runtime import ({seam.detail or seam.name}) — plugin-loading seam",),
+        signals=(_sig(_SIG_DYNIMPORT,
+                      f"runtime import ({seam.detail or seam.name}) — plugin-loading seam"),),
     )
 
 
 def _score_class(seam: Seam) -> ExtensionPoint:
     score = _W_PUBLIC_BASELINE
-    signals = ["public class"]
+    signals = [_sig(_SIG_PUBLIC, "public class")]
 
     if seam.kind == "abstract_class":
         score += _W_ABSTRACT
-        signals.append("abstract (ABC / @abstractmethod) — meant to be subclassed")
+        signals.append(_sig(_SIG_ABSTRACT, "abstract (ABC / @abstractmethod) — meant to be subclassed"))
 
     suffix = _class_role_suffix(seam.name)
     if suffix:
         score += _W_NAME_CLASS_ROLE
-        signals.append(f"name ends in '{suffix}' — role type")
+        signals.append(_sig(_SIG_CLASS_ROLE, f"name ends in '{suffix}' — role type"))
 
     # For classes, seam.detail holds bases (not decorators); a base matching a
     # role suffix hints the class implements an extension interface.
@@ -129,15 +169,15 @@ def _score_class(seam: Seam) -> ExtensionPoint:
             break
     if role_base:
         score += _W_NAME_CLASS_ROLE
-        signals.append(f"subclasses a '{role_base}' role type")
+        signals.append(_sig(_SIG_BASE_ROLE, f"subclasses a '{role_base}' role type"))
 
     if seam.reexported:
         score += _W_REEXPORT
-        signals.append("re-exported from the package's public entry point")
+        signals.append(_sig(_SIG_REEXPORT, "re-exported from the package's public entry point"))
 
     if seam.has_override_point:
         score += _W_OVERRIDE_POINT
-        signals.append("defines an override point (raises NotImplementedError)")
+        signals.append(_sig(_SIG_OVERRIDE, "defines an override point (raises NotImplementedError)"))
 
     category = (
         "subclass"
@@ -149,25 +189,25 @@ def _score_class(seam: Seam) -> ExtensionPoint:
 
 def _score_function(seam: Seam) -> ExtensionPoint:
     score = _W_PUBLIC_BASELINE
-    signals = ["public function"]
+    signals = [_sig(_SIG_PUBLIC, "public function")]
     category = "api"
 
     part = _name_hook_part(seam.name)
     if part:
         score += _W_NAME_HOOK
-        signals.append(f"name matches hook/registration pattern ('{part}')")
+        signals.append(_sig(_SIG_NAME_HOOK, f"name matches hook/registration pattern ('{part}')"))
         category = "hook" if part in ("on_", "hook", "emit", "dispatch", "listen") else "registration"
 
     deco = _registration_decorator(seam.detail)
     if deco:
         score += _W_REGISTRATION_DECORATOR
-        signals.append(f"registration-style decorator ('{deco}')")
+        signals.append(_sig(_SIG_REG_DECORATOR, f"registration-style decorator ('{deco}')"))
         if category == "api":
             category = "registration"
 
     if seam.reexported:
         score += _W_REEXPORT
-        signals.append("re-exported from the package's public entry point")
+        signals.append(_sig(_SIG_REEXPORT, "re-exported from the package's public entry point"))
 
     return ExtensionPoint(seam, category, min(score, _SCORE_MAX), tuple(signals))
 

@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-22
+
+A free CI gate that fails a pull request removing or changing a library's
+extension points, plus detect polish.
+
+### Added
+
+- **Breaking-change gate GitHub Action** (`Rinkia/modscan/breaking-change`). On a
+  pull request it runs `modscan detect` on the PR and on the base branch, diffs
+  the two, comments the diff, and fails the check when an extension point is
+  removed or its category/kind changed — protecting a library's plugin/mod
+  authors from silent breakage. No committed manifest, no LLM, no API key. The
+  `examples/ci/breaking-change.yml` recipe is now this free one-liner, and
+  MODScan runs the gate on its own API (`.github/workflows/extension-api-gate.yml`).
+- **`modscan diff` accepts `detect --json` output** (a flat list) as well as the
+  `{"points": [...]}` manifest, so the gate can diff free detect output with no
+  LLM step. `category` joins the compared fields; `score` is never compared, so
+  re-ranking alone is not a breaking change.
+- **`modscan detect --label`** — a header label instead of the scan path, so
+  committed or shared output (and the Action job summary) carries no local path.
+- **`examples/detect-markdown.md`** — a free, committed `detect` sample on
+  Python-Markdown.
+
+### Fixed
+
+- **No absolute scan path in detect ids.** A root-package symbol (empty qualname)
+  fell back to the absolute scan path in Markdown and JSON ids and the
+  registration location; it now uses the label, else the scan root's basename.
+  JSON gains an explicit `module` field (`null` for root-package symbols).
+- **The output directory is excluded from the scan.** Writing docs inside the
+  scanned tree no longer means a later run parses this run's generated files;
+  `parse_codebase` takes an `exclude`, and the run passes its output directory.
+
+### Changed
+
+- **GitHub Actions bumped off deprecated Node 20** — `checkout@v5`,
+  `setup-python@v6`, `upload-artifact@v6`, `download-artifact@v7`.
+
 ## [0.1.2] - 2026-07-21
 
 Robustness for runs against real, imperfect codebases, and cleaner output.
@@ -203,7 +241,8 @@ Initial MVP: the full pipeline, end to end.
   skeletons from the manifest.
 - Apache-2.0 licensing.
 
-[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/Rinkia/modscan/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/Rinkia/modscan/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/Rinkia/modscan/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Rinkia/modscan/compare/v0.0.1...v0.1.0

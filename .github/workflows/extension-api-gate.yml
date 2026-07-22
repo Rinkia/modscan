@@ -1,0 +1,36 @@
+# Dogfood: run MODScan's own breaking-change gate on MODScan's extension points.
+# This both proves the reusable Action works in real CI and guards MODScan's own
+# public API (LanguageParser, the provider protocol, ...) against silent removal.
+#
+# It installs modscan from THIS checkout (-e .), so the gate uses the PR's own
+# code — the reusable Action then skips its PyPI install because modscan is
+# already importable.
+name: Extension-API gate
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  extension-api-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # the gate needs the base branch to diff against
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install MODScan from this checkout (dogfood the PR's own code)
+        run: python -m pip install -e .
+
+      - name: Gate on MODScan's extension points
+        uses: ./breaking-change
+        with:
+          path: modscan

@@ -268,6 +268,43 @@ is the honest ceiling of structural heuristics on this benchmark, now measured
 rather than suspected. The lever is closed; the benchmark stays at **9/20**. No
 detector weight was changed.
 
+#### Follow-up rejected: widen the scan to the package's own `test/` + `examples/`
+
+The natural rescue is *"the `@compiles` and subclass evidence lives in the
+package's own test suite and doc examples — so scan those too and apply the
+evidence to the library symbols."* Measured on SQLAlchemy's 2.0.51 source
+tarball (the installed wheel ships no tests). **Rejected — the evidence and the
+noise are the same directory.**
+
+Subclass demonstrations of the buried bases do appear once `test/` is scanned —
+`UserDefinedType` goes from 0 in-library subclasses to 30, `FunctionElement` to
+12. But `test/` is also SQLAlchemy's largest subclass farm, and its base classes
+are shipped *inside the library* under `sqlalchemy/testing/`:
+
+| Evidence source | UserDefinedType | FunctionElement | TypeDecorator | Top of the subclass ranking |
+|---|---|---|---|---|
+| lib + `test/` + examples + doc | 30 | 12 | 113 | `TestBase` 604, `MappedTest` 365, `TablesTest` 187, `AssertsCompiledSQL` 387 — ten test-infra / declarative-boilerplate classes rank above the first real label |
+| lib + examples + doc (no `test/`) | **0** | **0** | 6 | clean, but the label evidence has collapsed to nothing |
+
+The two rows bracket it. With `test/` the buried labels finally get real counts
+but sit behind ~10–20 test-infrastructure bases — the exact classes the
+labelling rule explicitly excludes (*"`TablesTest`, `TestBase` — widely
+subclassed, but not by the people MODScan serves"*) — so they still miss the top
+ten and the output is flooded with the test framework. Without `test/` the flood
+is gone but so is the signal: the demonstrations lived almost entirely in the
+tests. Filtering candidates defined under `*/testing/*` removes the flood
+*classes* but not the problem — the evidence that would lift the real labels is
+in the same files. There is no window where the buried-label evidence is strong
+and the test-infra noise is absent, because extension is demonstrated *by
+subclassing in the tests*, which is also what the fixtures do en masse.
+
+So widening the scan does not help. Three measured negatives now share one root
+cause: these seams' extensibility is expressed by subclassing-in-tests and
+registration-in-user-code, both statistically indistinguishable from noise (test
+fixtures, concrete elements) to any count-based signal. Ranking is at its honest
+ceiling on this benchmark; the way forward is **more targets**, not another
+weight on these five.
+
 ### At risk: penalising private module paths
 
 *"Seams in `_private` modules are internal, so demote them."* Superficially

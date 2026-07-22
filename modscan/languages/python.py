@@ -31,8 +31,8 @@ class PythonLanguageParser:
     extensions = (".py",)
     validates = True  # examples can be imported & executed in-process
 
-    def parse_codebase(self, root: str) -> Codebase:
-        return _parse_python(root)
+    def parse_codebase(self, root: str, exclude: tuple[str, ...] = ()) -> Codebase:
+        return _parse_python(root, exclude=exclude)
 
 
 register_language(PythonLanguageParser())

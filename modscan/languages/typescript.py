@@ -199,11 +199,11 @@ class TypeScriptLanguageParser:
     extensions = _ALL_EXTS
     validates = False  # no in-process JS/TS execution; docs are static-only
 
-    def parse_codebase(self, root: str) -> Codebase:
+    def parse_codebase(self, root: str, exclude: tuple[str, ...] = ()) -> Codebase:
         ts_parser, tsx_parser = _load_parsers()
         root = os.path.abspath(root)
         codebase = Codebase(root=root)
-        for path in walk_source_files(root, _ALL_EXTS):
+        for path in walk_source_files(root, _ALL_EXTS, skip_paths=exclude):
             ext = os.path.splitext(path)[1]
             parser = tsx_parser if ext in _TSX_EXTS else ts_parser
             codebase.modules.append(_parse_file(path, root, parser))

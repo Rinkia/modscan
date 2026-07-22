@@ -50,6 +50,7 @@ Changelog = "https://github.com/Rinkia/modscan/blob/master/CHANGELOG.md"
 [project.scripts]
 modscan = "modscan.cli:main"
 modscan-mcp = "modscan.mcp_server:main"
+modscan-audit = "modscan.security.cli:main"
 
 [build-system]
 requires = ["setuptools>=77"]

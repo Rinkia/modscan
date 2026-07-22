@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Security Lens (`modscan-audit`)** — a sibling command that maps a Python
+  codebase's *attack surface*: where untrusted code or data can enter and execute
+  (`eval`/`exec`, `pickle`/`marshal`/`yaml` deserialization, `__reduce__`,
+  `os.system`/`subprocess`, and dynamic loaders). Findings use a Bandit-style
+  catalog — stable `MS-SEC-*` ids rated by **severity × confidence**, separate
+  from the moddability score — and rank most-dangerous-first. Offline and free (no
+  LLM). Markdown or `--json`. Every report states prominently that it is **not** a
+  vulnerability scan: no taint analysis, CVE matching, or secret detection, and an
+  empty report is not a clean bill of health. Enumeration only — it locates sinks,
+  it does not trace reachability.
+- **Stable IDs on moddability signals** — each ranking reason now carries a stable
+  `MS-MOD-*` id (presentation only; the score and ranking are unchanged).
+
 ## [0.1.4] - 2026-07-22
 
 Downstream polish: scaffolds you can verify, docs that point at them, and a gate

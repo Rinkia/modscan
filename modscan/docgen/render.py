@@ -33,6 +33,17 @@ _EXT_FENCE = {".py": "python", ".js": "javascript", ".ts": "typescript"}
 _DEFAULT_EXT = ".ts"
 _DEFAULT_FENCE = "typescript"
 
+# What each example-status badge in the index table means. Keyed by the bare
+# ExampleStatus value so the legend and the badges stay in lockstep. INVALID is
+# transient (it triggers a retry and never survives to a badge), so it is omitted.
+_STATUS_LEGEND: tuple[tuple[ExampleStatus, str], ...] = (
+    (ExampleStatus.VERIFIED, "example subclass executed and instantiated"),
+    (ExampleStatus.EXECUTED, "non-subclass example loaded cleanly"),
+    (ExampleStatus.COMPILED, "syntactically valid only (example validation disabled)"),
+    (ExampleStatus.GENERATED, "written by the LLM, not executed (non-Python target)"),
+    (ExampleStatus.UNVERIFIED, "could not be validated automatically after retries"),
+)
+
 
 def example_ext(language: str) -> str:
     return _LANGUAGE_EXT.get(language, _DEFAULT_EXT)
@@ -100,6 +111,8 @@ def render_index(overview: str, generated: list[GeneratedPoint], dropped: list |
             f"| `{gp.fact.point_id}` | {gp.fact.category} | "
             f"{gp.fact.module}:{gp.fact.lineno} | {badge} |"
         )
+    lines += ["", "**Example status**"]
+    lines += [f"- `{status}` — {meaning}" for status, meaning in _STATUS_LEGEND]
     lines += _render_dropped(dropped or [])
     lines += ["", "See [plugin-guide.md](plugin-guide.md) for how to build each one."]
     return "\n".join(lines) + "\n"
@@ -114,6 +127,7 @@ def render_guide(generated: list[GeneratedPoint]) -> str:
             f"- **Category:** {gp.fact.category}",
             f"- **Location:** {gp.fact.module}:{gp.fact.lineno}",
             f"- **Example status:** {gp.example_status}",
+            f'- **Scaffold:** `modscan scaffold "{gp.fact.point_id}"`',
             "",
             gp.guide.strip(),
             "",

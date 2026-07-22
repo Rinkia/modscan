@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A live example of the breaking-change gate**, linked from the README:
+  [`modscan-gate-example`](https://github.com/Rinkia/modscan-gate-example) shows a
+  safe PR passing and a breaking PR failing, with the gate's comments.
+
 ## [0.1.3] - 2026-07-22
 
 A free CI gate that fails a pull request removing or changing a library's

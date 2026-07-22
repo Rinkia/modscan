@@ -88,6 +88,56 @@ def test_render_markdown_mentions_verdict() -> None:
     assert "b:B" in md
 
 
+# --- detect --json (flat list) shape ---------------------------------------
+
+
+def _d(pid: str, category: str = "subclass", kind: str = "class", score: float = 1.0) -> dict:
+    """A point in the shape `detect --json` emits: a flat item, no manifest wrapper."""
+    return {"id": pid, "module": pid.split(":")[0], "category": category,
+            "kind": kind, "score": score, "signals": ["public class"]}
+
+
+def test_flat_detect_list_removed_is_breaking() -> None:
+    """A diff can run straight off `detect --json` output — a plain list."""
+    old = [_d("a:A"), _d("b:B")]
+    new = [_d("a:A")]
+    diff = diff_manifests(old, new)
+    assert diff.breaking
+    assert diff.removed == ["b:B"]
+
+
+def test_flat_detect_list_added_is_safe() -> None:
+    diff = diff_manifests([_d("a:A")], [_d("a:A"), _d("c:C")])
+    assert not diff.breaking
+    assert diff.added == ["c:C"]
+
+
+def test_category_change_is_breaking() -> None:
+    old = [_d("a:A", category="subclass")]
+    new = [_d("a:A", category="api")]
+    diff = diff_manifests(old, new)
+    assert diff.breaking
+    assert any(c.field == "category" for c in diff.changed)
+
+
+def test_score_only_change_is_not_breaking() -> None:
+    """Re-ranking without changing the set of seams must not fail the gate."""
+    old = [_d("a:A", score=1.0)]
+    new = [_d("a:A", score=0.4)]
+    diff = diff_manifests(old, new)
+    assert not diff.breaking
+    assert diff.changed == []
+
+
+def test_mixed_manifest_and_flat_both_index() -> None:
+    """Both shapes index the same way — the manifest path is unchanged."""
+    manifest = _m([_p("a:A")])
+    flat = [_d("a:A")]
+    # each diffed against itself is a no-op; the point is that neither raises
+    assert not diff_manifests(manifest, manifest).breaking
+    assert not diff_manifests(flat, flat).breaking
+
+
 def test_cli_diff_exit_codes() -> None:
     with tempfile.TemporaryDirectory() as d:
         old_path = os.path.join(d, "old.json")
@@ -113,5 +163,10 @@ if __name__ == "__main__":
     test_signature_change_is_breaking()
     test_new_required_method_is_breaking()
     test_render_markdown_mentions_verdict()
+    test_flat_detect_list_removed_is_breaking()
+    test_flat_detect_list_added_is_safe()
+    test_category_change_is_breaking()
+    test_score_only_change_is_not_breaking()
+    test_mixed_manifest_and_flat_both_index()
     test_cli_diff_exit_codes()
     print("OK: diff self-check passed")

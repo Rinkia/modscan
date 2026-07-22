@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The breaking-change gate now posts a sticky PR comment.** It finds its own
+  prior comment by a hidden marker and updates it in place, instead of stacking a
+  fresh comment on every re-push. `render_diff_markdown` emits the marker
+  (`DIFF_COMMENT_MARKER`) as its first line.
+
 ### Added
 
 - **Docs link to scaffolding, and explain the status badges.** The generated

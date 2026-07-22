@@ -83,13 +83,23 @@ runs:
         set -e
         cat /tmp/modscan-diff.md | tee -a "$GITHUB_STEP_SUMMARY"
 
-    - name: Comment the diff on the PR
+    - name: Comment the diff on the PR (sticky — update in place, don't stack)
       if: always() && github.event_name == 'pull_request'
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        gh pr comment "${{ github.event.pull_request.number }}" --body-file /tmp/modscan-diff.md || \
+        num="${{ github.event.pull_request.number }}"
+        marker="<!-- modscan-extension-point-diff -->"
+        # Find a prior MODScan comment by its hidden marker and edit it; otherwise
+        # post a new one. Keeps one up-to-date comment instead of one per re-push.
+        cid=$(gh api "repos/${{ github.repository }}/issues/$num/comments" \
+          --jq "map(select(.body | contains(\"$marker\"))) | .[-1].id // empty" 2>/dev/null || true)
+        if [ -n "$cid" ]; then
+          gh api "repos/${{ github.repository }}/issues/comments/$cid" -X PATCH \
+            -F body=@/tmp/modscan-diff.md >/dev/null && exit 0
+        fi
+        gh pr comment "$num" --body-file /tmp/modscan-diff.md || \
           echo "::warning::could not comment (needs pull-requests: write and GH_TOKEN)"
 
     - name: Fail on breaking changes

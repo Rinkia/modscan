@@ -88,6 +88,15 @@ def test_render_markdown_mentions_verdict() -> None:
     assert "b:B" in md
 
 
+def test_render_markdown_carries_sticky_marker() -> None:
+    # The marker must be on the first line so a CI gate can find and update its
+    # own prior comment instead of stacking a new one each re-push.
+    from modscan.diff import DIFF_COMMENT_MARKER
+
+    md = render_diff_markdown(diff_manifests(_m([_p("a:A")]), _m([_p("a:A")])))
+    assert md.startswith(DIFF_COMMENT_MARKER)
+
+
 # --- detect --json (flat list) shape ---------------------------------------
 
 

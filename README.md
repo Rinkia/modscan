@@ -166,11 +166,35 @@ untrusted PRs, since `detect` runs no LLM and executes no target code:
 
 ```yaml
 - uses: actions/checkout@v4
-- uses: Rinkia/modscan@v0.1.1
+- uses: Rinkia/modscan@v0.1.3
   with:
     path: .
     min-score: "0.5"
 ```
+
+### Breaking-change gate for your plugin API
+
+If your library has plugin/mod authors, guard them from silent breakage: fail a
+pull request that **removes or changes an extension point**. It diffs `detect` on
+the PR against the base branch — no committed manifest, no LLM, no API key.
+
+```yaml
+# .github/workflows/extension-api.yml
+on: pull_request
+permissions: { contents: read, pull-requests: write }
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }        # the gate needs the base branch
+      - uses: Rinkia/modscan/breaking-change@v0.1.3
+        with: { path: your_package }
+```
+
+On a PR it comments the diff and fails the check when an extension point is gone
+or its category/kind changed. A score/ranking change alone is not breaking.
+(MODScan uses this on itself — see `.github/workflows/extension-api-gate.yml`.)
 
 ### From an AI client (MCP server)
 

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`modscan scaffold --verify`** — after writing plugin skeletons, imports the
+  target and confirms each base actually subclasses/instantiates (or, for
+  hook/registration points, imports and is callable), reusing the layer-5
+  validator. Offline and free (no LLM, no API key); exits non-zero if any point
+  fails, so it doubles as a CI check that a scaffolded contract still holds. It is
+  opt-in because verification executes the target's module code — the default
+  scaffold path stays purely deterministic and never imports the target.
 - **A live example of the breaking-change gate**, linked from the README:
   [`modscan-gate-example`](https://github.com/Rinkia/modscan-gate-example) shows a
   safe PR passing and a breaking PR failing, with the gate's comments.

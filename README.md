@@ -248,6 +248,11 @@ modscan scaffold "pkg.mod:Symbol" --manifest modding-docs/extension-points.json
 # -> writes pkg_mod_Symbol_plugin.py: a concrete subclass with stubbed methods
 
 modscan scaffold --all --out plugins/   # skeletons for every documented point
+
+# --verify imports the target and confirms each base subclasses / is callable.
+# Opt-in: it EXECUTES the target's module code, so run only on code you trust.
+# Exits non-zero if any point fails to verify (offline, no LLM, no API key).
+modscan scaffold --all --out plugins/ --verify
 ```
 
 Diff two manifests to catch breaking changes when the target app updates (exits

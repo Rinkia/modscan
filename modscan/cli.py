@@ -42,7 +42,13 @@ from modscan.providers import (
     get_provider,
 )
 from modscan.providers.base import DEFAULT_MAX_TOKENS
-from modscan.scaffold import scaffold, scaffold_all
+from modscan.scaffold import (
+    load_manifest,
+    scaffold,
+    scaffold_all,
+    verify_all,
+    verify_point,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -134,7 +140,30 @@ def build_scaffold_parser() -> argparse.ArgumentParser:
         help="path to extension-points.json (default: modding-docs/extension-points.json)",
     )
     parser.add_argument("--out", default=".", help="output directory (default: .)")
+    parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="after writing, import the target and confirm each base subclasses / "
+        "is callable (opt-in; EXECUTES the target's module code — run only on "
+        "code you trust). Exits 1 if any point fails to verify.",
+    )
     return parser
+
+
+def _report_verifications(results: list) -> int:
+    """Print PASS/FAIL/SKIP per verified point; return 1 if any genuinely failed."""
+    failed = 0
+    for r in results:
+        if r.method == "skipped":
+            tag = "SKIP"
+        elif r.ok:
+            tag = "PASS"
+        else:
+            tag = "FAIL"
+            failed += 1
+        print(f"  {tag}  {r.point.seam.module}:{r.point.seam.name}  ({r.method}) {r.detail}")
+    print(f"Verified {len(results)} point(s): {len(results) - failed} ok, {failed} failed")
+    return 1 if failed else 0
 
 
 def _main_scaffold(argv: list[str]) -> int:
@@ -145,6 +174,8 @@ def _main_scaffold(argv: list[str]) -> int:
     if args.all:
         paths = scaffold_all(args.manifest, args.out)
         print(f"Wrote {len(paths)} plugin skeleton(s) to {args.out}")
+        if args.verify:
+            return _report_verifications(verify_all(load_manifest(args.manifest)))
         return 0
     if not args.point_id:
         print("error: provide a point id or --all", file=sys.stderr)
@@ -155,6 +186,8 @@ def _main_scaffold(argv: list[str]) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(f"Wrote plugin skeleton: {path}")
+    if args.verify:
+        return _report_verifications([verify_point(load_manifest(args.manifest), args.point_id)])
     return 0
 
 

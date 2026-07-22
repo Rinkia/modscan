@@ -138,7 +138,9 @@ def generate_docs(
     retries = ex.clamp_retries(max_example_retries)
 
     parser = get_language_parser(language)
-    codebase = parser.parse_codebase(root)
+    # Keep this run's own output out of the scan: if out_dir sits inside the
+    # scanned tree, a re-run would otherwise parse the files this run generated.
+    codebase = parser.parse_codebase(root, exclude=(out_dir,))
     graph = build_graph(codebase)
     points = detect_extension_points(graph, min_score=min_score)
 

@@ -52,14 +52,28 @@ SKIP_DIRS = frozenset(
 )
 
 
-def walk_source_files(root: str, extensions: tuple[str, ...]) -> Iterator[str]:
+def _canon(path: str) -> str:
+    """Normalized absolute path for reliable comparison across case and symlinks."""
+    return os.path.normcase(os.path.realpath(path))
+
+
+def walk_source_files(
+    root: str, extensions: tuple[str, ...], skip_paths: tuple[str, ...] = ()
+) -> Iterator[str]:
     """Yield paths under `root` whose extension is in `extensions`.
 
-    Prunes SKIP_DIRS in place so pruned subtrees are never descended into.
+    Prunes SKIP_DIRS by name and any directory in `skip_paths` by path, in place,
+    so pruned subtrees are never descended into. `skip_paths` is how a run keeps
+    its own output directory out of a later scan when it sits inside the tree.
     Order is deterministic (sorted per directory) so scans are reproducible.
     """
+    skip = {_canon(p) for p in skip_paths}
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if d not in SKIP_DIRS)
+        dirnames[:] = sorted(
+            d
+            for d in dirnames
+            if d not in SKIP_DIRS and _canon(os.path.join(dirpath, d)) not in skip
+        )
         for filename in sorted(filenames):
             if os.path.splitext(filename)[1] in extensions:
                 yield os.path.join(dirpath, filename)

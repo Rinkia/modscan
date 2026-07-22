@@ -387,14 +387,14 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
 
-    # Self-scan guard: writing output inside the scanned tree makes the next run
-    # scan this run's generated files. Warn and point at a fix, rather than
-    # silently rescanning generated output.
+    # Self-scan guard: output inside the scanned tree is now excluded from the
+    # scan (see generate_docs), so a re-run does not parse generated files. Still
+    # note it — writing output outside the target keeps scans obviously clean.
     if _is_inside(args.out, args.root):
         print(
-            f"warning: output '{args.out}' is inside the scanned tree "
-            f"'{args.root}'. A later run would scan this run's generated files. "
-            "Write output elsewhere with --out <dir outside the target>.",
+            f"note: output '{args.out}' is inside the scanned tree '{args.root}'. "
+            "MODScan excludes it from scanning, so re-runs are safe; writing "
+            "output outside the target is still tidier.",
             file=sys.stderr,
         )
 

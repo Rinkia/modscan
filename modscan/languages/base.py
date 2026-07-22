@@ -30,8 +30,12 @@ from modscan.models import Codebase
 class LanguageParser(Protocol):
     name: str
 
-    def parse_codebase(self, root: str) -> Codebase:
-        """Parse every source file of this language under `root`."""
+    def parse_codebase(self, root: str, exclude: tuple[str, ...] = ()) -> Codebase:
+        """Parse every source file of this language under `root`.
+
+        `exclude` lists directory paths to keep out of the scan — used to skip a
+        run's own output directory when it sits inside the scanned tree.
+        """
         ...
 
 

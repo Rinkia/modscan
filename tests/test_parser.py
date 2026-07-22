@@ -240,8 +240,34 @@ def test_override_point_detected() -> None:
     print("OK: override-point detection self-check passed")
 
 
+def test_parse_codebase_excludes_output_dir() -> None:
+    """A directory passed in `exclude` is not scanned — the self-scan guard: a
+    run's output living inside the tree is never parsed by a later run."""
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "real.py"), "w", encoding="utf-8") as fh:
+            fh.write("class Real:\n    pass\n")
+        out = os.path.join(root, "modding-docs")
+        os.makedirs(os.path.join(out, "examples"))
+        # a file a previous run might have generated inside the output dir
+        with open(os.path.join(out, "examples", "gen_plugin.py"), "w", encoding="utf-8") as fh:
+            fh.write("class Generated:\n    pass\n")
+
+        without = parse_codebase(root)
+        assert any(m.qualname.endswith("gen_plugin") for m in without.modules), \
+            "sanity: without exclude, the generated file IS scanned (the hazard)"
+
+        with_exclude = parse_codebase(root, exclude=(out,))
+        names = {m.qualname for m in with_exclude.modules}
+        assert "real" in names, "the real source is still scanned"
+        assert not any(q.endswith("gen_plugin") for q in names), \
+            "the excluded output dir is not scanned"
+
+    print("OK: output-dir exclusion self-check passed")
+
+
 if __name__ == "__main__":
     test_parser_and_graph()
     test_new_dynamic_calls()
     test_import_module_still_isolated_via_parse_file()
     test_override_point_detected()
+    test_parse_codebase_excludes_output_dir()

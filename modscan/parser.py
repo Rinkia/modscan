@@ -225,11 +225,11 @@ def parse_file(path: str, root: str | None = None) -> ModuleInfo:
     return module
 
 
-def parse_codebase(root: str) -> Codebase:
-    """Recursively parse every .py file under `root`."""
+def parse_codebase(root: str, exclude: tuple[str, ...] = ()) -> Codebase:
+    """Recursively parse every .py file under `root`, skipping `exclude` dirs."""
     root = os.path.abspath(root)
     codebase = Codebase(root=root)
-    for path in walk_source_files(root, (".py",)):
+    for path in walk_source_files(root, (".py",), skip_paths=exclude):
         codebase.modules.append(parse_file(path, root))
     codebase.modules.sort(key=lambda m: m.qualname)
     return codebase

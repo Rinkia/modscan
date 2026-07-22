@@ -196,9 +196,13 @@ def _split_detect_points(points: list) -> tuple[list, list]:
     return implement, registration
 
 
-def _render_detect_markdown(implement: list, registration: list, root: str) -> str:
+def _render_detect_markdown(
+    implement: list, registration: list, root: str, label: str | None = None
+) -> str:
+    # `label` overrides the header (which otherwise shows the scan path) so
+    # committed or shared output carries a clean name instead of a local path.
     lines = [
-        f"# Extension points in `{root}`",
+        f"# Extension points in `{label or root}`",
         "",
         f"{len(implement)} candidate(s), ranked by moddability. No LLM was used — "
         "this is the static ranking only.",
@@ -258,6 +262,12 @@ def _main_detect(argv: list[str]) -> int:
     parser.add_argument(
         "--json", action="store_true", help="emit JSON instead of a Markdown table"
     )
+    parser.add_argument(
+        "--label",
+        default=None,
+        help="header label for the Markdown output instead of the scan path "
+        "(e.g. 'markdown 3.10.2'), so committed or shared output carries no local path",
+    )
     args = parser.parse_args(argv)
     if not os.path.isdir(args.root):
         print(f"error: not a directory: {args.root}", file=sys.stderr)
@@ -289,7 +299,7 @@ def _main_detect(argv: list[str]) -> int:
         ]
         print(json.dumps(payload, indent=2))
     else:
-        print(_render_detect_markdown(implement, registration, args.root))
+        print(_render_detect_markdown(implement, registration, args.root, args.label))
     return 0
 
 

@@ -46,15 +46,23 @@ class ManifestDiff:
         return bool(self.removed) or bool(self.changed)
 
 
-# Fields whose change can break an existing plugin.
-_COMPARED_FIELDS = ("signature", "implement", "kind")
+# Fields whose change can break an existing plugin. `signature`/`implement` come
+# from the LLM-generated manifest; `kind`/`category` from a `detect --json` list.
+# A field absent on both sides compares equal, so each input shape only flags the
+# fields it actually carries. `score` is deliberately excluded: re-ranking a
+# package without changing its set of extension points is not a breaking change.
+_COMPARED_FIELDS = ("signature", "implement", "kind", "category")
 
 
-def _index(manifest: dict) -> dict[str, dict]:
-    return {p["id"]: p for p in manifest.get("points", []) if "id" in p}
+def _index(data: dict | list) -> dict[str, dict]:
+    """Index points by id, accepting either a `{"points": [...]}` manifest or the
+    flat list that `detect --json` emits — so a diff can run off free detect
+    output as well as an LLM-generated manifest."""
+    points = data if isinstance(data, list) else data.get("points", [])
+    return {p["id"]: p for p in points if "id" in p}
 
 
-def diff_manifests(old: dict, new: dict) -> ManifestDiff:
+def diff_manifests(old: dict | list, new: dict | list) -> ManifestDiff:
     old_points = _index(old)
     new_points = _index(new)
 

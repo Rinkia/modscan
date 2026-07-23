@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The security lens is exposed over MCP** — `modscan-mcp` gains an
+  `audit_attack_surface` tool beside `detect_extension_points`, so an AI client
+  can map where untrusted code enters as well as where a codebase is extensible.
+  It returns exactly the payload `modscan-audit --json` emits, built through the
+  same renderer so the two cannot drift — which means the non-coverage disclaimer
+  travels with the data and an empty result still says it is not a clean bill of
+  health. The two tools keep their own vocabulary: moddability and attack surface
+  are different questions, and neither answer is phrased in the other's terms.
+
 - **The security lens covers TypeScript/JavaScript** — `modscan-audit --language
   typescript` (or `javascript`) maps `eval`, `Function`/`new Function`, the `vm`
   module, the `child_process` family, dynamic `require`/`import`, and string-body

@@ -112,6 +112,25 @@ def _js_version(target: str) -> str | None:
         return None
 
 
+JAVA_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "java")
+
+
+def _java_package_dir(target: str, pinned: str) -> str:
+    """Sources unpacked by benchmarks/java/fetch.py, version in the dir name."""
+    return os.path.join(JAVA_ROOT, f"{target}-{pinned}")
+
+
+def _skip_reason_java(target: str, pinned: str) -> str | None:
+    if not os.path.isdir(_java_package_dir(target, pinned)):
+        return f"not fetched - python benchmarks/java/fetch.py"
+    try:
+        import tree_sitter  # noqa: F401
+        import tree_sitter_java  # noqa: F401
+    except ImportError:
+        return "tree-sitter-java not installed - pip install modscan[java]"
+    return None
+
+
 def _skip_reason_js(target: str, pinned: str) -> str | None:
     """Why a JS/TS target cannot be scored, or None if it can be."""
     if not os.path.isdir(_js_package_dir(target)):
@@ -134,6 +153,8 @@ def _skip_reason_js(target: str, pinned: str) -> str | None:
 
 def _skip_reason(target: str, pinned: str, language: str = "python") -> str | None:
     """Why this target cannot be scored, or None if it can be."""
+    if language == "java":
+        return _skip_reason_java(target, pinned)
     if language != "python":
         return _skip_reason_js(target, pinned)
     try:
@@ -152,7 +173,10 @@ def _skip_reason(target: str, pinned: str, language: str = "python") -> str | No
 
 
 def rank_labels(
-    target: str, labels: set[str], language: str = "python"
+    target: str,
+    labels: set[str],
+    language: str = "python",
+    pinned: str = "",
 ) -> tuple[dict[str, int], int]:
     """Rank of every labelled point in the detector's output, plus the candidate count.
 
@@ -164,14 +188,19 @@ def rank_labels(
         root = os.path.dirname(importlib.import_module(target).__file__)
         codebase = parse_codebase(root)
     else:
-        # JS/TS targets live under benchmarks/js/node_modules. Their module
-        # qualnames are path-shaped ("lib/command"), so ids are target-qualified
-        # as "commander/lib/command:Command" - the same convention the Python
-        # side uses, and what keeps a label checkable against its own package.
-        from modscan.languages.base import get_language_parser
-        import modscan.languages.typescript  # noqa: F401  (registers the front-end)
+        # Non-Python targets are fetched into benchmarks/<lang>/ and their module
+        # qualnames are not package-prefixed ("lib/command",
+        # "org.junit.jupiter.api.extension.Extension"), so ids are
+        # target-qualified - "commander/lib/command:Command". That keeps the
+        # "an id belongs to its target" invariant the label self-check enforces.
+        from modscan.languages import get_language_parser  # registers front-ends
 
-        codebase = get_language_parser("typescript").parse_codebase(_js_package_dir(target))
+        root = (
+            _java_package_dir(target, pinned)
+            if language == "java"
+            else _js_package_dir(target)
+        )
+        codebase = get_language_parser(language).parse_codebase(root)
     points = detect_extension_points(build_graph(codebase))
 
     ranks: dict[str, int] = {}
@@ -218,7 +247,7 @@ def main() -> int:
             continue
 
         labels = {p["id"] for p in target["extension_points"]}
-        ranks, candidates = rank_labels(name, labels, language)
+        ranks, candidates = rank_labels(name, labels, language, pinned)
 
         hits, total = recall_at_k(ranks)
         scored_hits += hits

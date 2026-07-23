@@ -32,3 +32,6 @@ scratchpad/
 
 # Installed JS toolchain + scan targets for the TS cross-check (npm install)
 node_modules/
+
+# Java benchmark sources unpacked from Maven Central (benchmarks/java/fetch.py)
+benchmarks/java/*-*/

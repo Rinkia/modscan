@@ -391,6 +391,71 @@ A JS/TS target is declared with `"language": "typescript"` in
 and it is skipped with a notice if the installed version is not the pinned one.
 Ids are target-qualified path form — `commander/lib/help:Help`.
 
+## The first Java target: a good score that means less than it looks
+
+`junit-jupiter-api` 5.11.3 is the first Java target, fetched from Maven Central
+as a version-pinned `-sources.jar`.
+
+| Target | Candidates | Labels | Rank of each label | recall@10 | Median |
+|---|---|---|---|---|---|
+| junit-jupiter-api 5.11.3 | 61 | 7 | 5, 7, 8, 9, 11, 14, 18 | **4/7** | 9 |
+
+**A prediction was made before this ran, and it was wrong.** The expectation was
+a poor showing, because the re-export signal — the one signal measured to
+generalize — has no Java analogue: there is no `__init__.py` and no barrel
+module. Re-export *is* inert. But Java's extension points are interfaces
+(abstract by construction) with role-suffix names (`*Callback`, `*Handler`,
+`*Resolver`) extending a role-named base (`Extension`), so **abstract**,
+**class-role** and **base-role** stack to a perfect 1.00 instead.
+
+### Why 4/7 is not evidence the ranking works
+
+**Eighteen candidates tie at exactly 1.00**, and inside that band the order is
+strictly alphabetical:
+
+```
+ 1 AfterAllCallback      5 BeforeEachCallback    9 InvocationInterceptor
+ 2 AfterEachCallback     6 BeforeTestExecutionCallback
+ 3 AfterTestExecutionCallback                   10 LifecycleMethodExecutionExceptionHandler
+ 4 BeforeAllCallback     7 ExecutionCondition   11 ParameterResolver
+                         8 Extension            ...
+```
+
+The top-ten cutoff falls mid-alphabet. `ParameterResolver` (11),
+`TestInstancePostProcessor` (14) and `TestWatcher` (18) are "missed" while
+scoring **identically** to the four that made it. The 4/7 is decided by the
+alphabet.
+
+This is the SQLAlchemy flat band again, in a happier disguise. There, hundreds of
+tied symbols buried five real seams. Here almost every tied symbol *is* a real
+seam — precision at the top is close to perfect — but recall@10 cannot express
+"eighteen equally valid answers, pick ten". That is as much a limit of the metric
+as of the ranking, and it is why median rank is reported alongside.
+
+The honest reading: Java's structure suits the existing signals unusually well,
+and this target cannot distinguish a ranking that understands JUnit from one that
+sorts JUnit's interfaces alphabetically. A target whose extension points are
+*not* uniformly shaped would say more.
+
+**Labels come from the package's own Javadoc at the pinned version**, not the
+"current" web guide, so they stay checkable against exactly this source — each
+quotes a sentence of the form *"defines the API for Extensions that wish to…"*.
+The list is deliberately partial: the remaining lifecycle callbacks are
+documented identically and are not all labelled.
+
+### Running the Java targets
+
+```bash
+python benchmarks/java/fetch.py    # unpacks pinned -sources.jar from Maven Central
+pip install modscan[java]
+python benchmarks/score.py
+```
+
+A Java target declares `"language": "java"` and a `"maven"` coordinate. The
+version lives in the unpacked directory name (`junit-jupiter-api-5.11.3/`), so a
+mismatch is caught structurally and skipped with a notice — the same discipline
+the pip and npm targets follow. Unpacked sources are gitignored.
+
 ## Adding a target
 
 1. Pick a package with real documentation — the rule depends on it.

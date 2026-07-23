@@ -77,6 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
         "never the full scan path)",
     )
     parser.add_argument(
+        "--language",
+        choices=("python", "typescript", "javascript"),
+        default="python",
+        help="source language of the tree to scan (default: python). "
+        "typescript/javascript need the tree-sitter extra: pip install modscan[typescript]",
+    )
+    parser.add_argument(
         "--exclude",
         action="append",
         default=[],
@@ -138,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: not a directory: {args.root}", file=sys.stderr)
         return 2
 
-    sinks = find_risk_sinks(args.root, exclude=tuple(args.exclude))
+    sinks = find_risk_sinks(args.root, exclude=tuple(args.exclude), language=args.language)
     label = args.label or os.path.basename(os.path.abspath(args.root))
     report = render_json(sinks, label) if args.json else render_markdown(sinks, label)
     print(report, end="")

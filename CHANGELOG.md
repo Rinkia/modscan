@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The security lens covers TypeScript/JavaScript** — `modscan-audit --language
+  typescript` (or `javascript`) maps `eval`, `Function`/`new Function`, the `vm`
+  module, the `child_process` family, dynamic `require`/`import`, and string-body
+  `setTimeout`/`setInterval`, reusing the existing tree-sitter front-end. Modelled
+  on `eslint-plugin-security`, the JS counterpart to Bandit: a computed
+  `require(name)` is a sink but a literal `require('fs')` is not, matching its
+  `detect-non-literal-require` rule. Shell-invoking `child_process.exec` rates
+  high, the no-shell family medium — the same split the Python catalog makes.
+  Because idiomatic JS destructures (`const {exec} = require('child_process')`),
+  each file's `require`/`import` bindings are resolved before matching, so aliased
+  and destructured calls are found while `someRegex.exec(str)` and `JSON.parse`
+  are not. Binding resolution is file-local: a binding passed through another
+  module is not followed.
+
 - **More process sinks, and `shell=True` now raises severity.** Cross-checking the
   security lens against Bandit on real packages surfaced a genuine gap: `os.popen`,
   `os.startfile`, the `os.exec*`/`os.spawn*` family and `commands.getoutput` were

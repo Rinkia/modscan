@@ -84,12 +84,27 @@ def _sink_from_reduce(node: ast.AST, module: str) -> RiskSink | None:
     )
 
 
-def find_risk_sinks(root: str, exclude: tuple[str, ...] = ()) -> list[RiskSink]:
+def find_risk_sinks(
+    root: str, exclude: tuple[str, ...] = (), language: str = "python"
+) -> list[RiskSink]:
     """Every risk sink under ``root``, sorted by (module, line, name).
 
     Uses ``parse_codebase`` for file discovery + qualnames (skipping files it
     could not parse), then re-parses each to walk for sinks.
+
+    ``language`` selects the front-end; "typescript"/"javascript" share the
+    tree-sitter detector. Python is the default, so the released call signature
+    is unchanged.
     """
+    if language in ("typescript", "javascript"):
+        from modscan.security.detect_ts import find_ts_risk_sinks
+
+        return find_ts_risk_sinks(root, exclude=exclude)
+    if language != "python":
+        raise ValueError(
+            f"unknown language {language!r}; expected 'python', 'typescript' or 'javascript'"
+        )
+
     codebase = parse_codebase(root, exclude=exclude)
     sinks: list[RiskSink] = []
     for mod in codebase.ok_modules:

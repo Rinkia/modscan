@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`modscan-audit --diff BASE PR`** — compare two `--json` attack-surface
+  snapshots and report the execution sinks the second one *introduces*. Sinks are
+  identified by `(id, module, call)` and compared as a counted multiset, so moved
+  code never registers as a change while a third `eval` added to a module that
+  already had two still shows up. Reports only — failing CI on new sinks comes
+  next. The report carries its own sticky-comment marker, distinct from the
+  breaking-change gate's, so a repo running both gets two independent comments.
+
 ## [0.1.5] - 2026-07-22
 
 A second lens over the same static analysis: `modscan-audit` maps a codebase's

@@ -1,4 +1,47 @@
-# Security-lens cross-check — validating against Bandit
+# Security-lens cross-check — validating against external tools
+
+Two checks live here, one per language:
+
+| Language | Authority | Script | Result |
+|---|---|---|---|
+| Python | [Bandit](https://github.com/PyCQA/bandit) | `crosscheck.py` | 27/27 in-scope |
+| TypeScript / JavaScript | [eslint-plugin-security](https://github.com/eslint-community/eslint-plugin-security) | `crosscheck_ts.py` | 10/10 in-scope |
+
+## TypeScript / JavaScript
+
+```bash
+cd security-crosscheck/js && npm install
+python security-crosscheck/crosscheck_ts.py
+```
+
+`js/eslint.config.mjs` enables exactly the three rules inside the lens's scope —
+`detect-eval-with-expression` (code_exec), `detect-child-process` (process) and
+`detect-non-literal-require` (dynamic_load). The plugin's other rules (unsafe
+regex, object injection, timing attacks, fs filenames, pseudo-random bytes) are
+left off: the lens does not claim them.
+
+Measured across shelljs, cross-spawn, rechoir, liftoff, open and resolve:
+**10/10 in-scope recall, no eslint-only findings.**
+
+Expected asymmetries, as with Bandit:
+
+- eslint flags `eval` only with a *computed* argument; the lens flags every
+  `eval`, matching Bandit's stance on the Python side.
+- eslint has no rule for `new Function`, the `vm` module or string-bodied timers,
+  all of which the lens catalogues. Those show as lens-only coverage.
+- eslint's `detect-child-process` covers `exec` but not `spawn`/`execFileSync`;
+  the lens covers the whole family, split shell vs no-shell.
+
+> One bug this check caught in itself: reading eslint's output with the platform
+> locale silently dropped findings on a Windows cp1252 console, which turned real
+> agreements into apparent divergences and *inflated* recall. The subprocess now
+> decodes UTF-8 explicitly. A validation harness that lies quietly is worse than
+> none.
+
+`node_modules/` is gitignored; `package.json` + `package-lock.json` are committed
+so the toolchain and scan targets are reproducible.
+
+## Python — validating against Bandit
 
 The security lens cannot validate itself. Judging `modscan-audit` by its own
 output would be exactly the circularity the moddability benchmark exists to

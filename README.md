@@ -151,6 +151,10 @@ pip install modscan
 modscan detect ./path/to/project            # ranked Markdown table
 modscan detect ./path/to/project --json     # machine-readable, for tooling/CI
 modscan detect ./path/to/project --limit 10 # just the top 10
+
+# Other languages (optional extras)
+modscan detect ./src --language typescript  # pip install modscan[typescript]
+modscan detect ./src --language java        # pip install modscan[java]
 ```
 
 Point it at an installed package to see it work immediately:

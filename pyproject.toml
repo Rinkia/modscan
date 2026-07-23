@@ -38,6 +38,7 @@ dependencies = []
 anthropic = ["anthropic>=0.40"]
 openai = ["openai>=1.40"]
 typescript = ["tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
+java = ["tree-sitter>=0.21", "tree-sitter-java>=0.23"]
 gemini = ["google-generativeai>=0.8"]
 mcp = ["mcp>=1.0"]
 # Validating the security lens against Bandit — see security-crosscheck/.

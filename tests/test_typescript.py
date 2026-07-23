@@ -92,6 +92,53 @@ def test_ts_parses_into_seams() -> int:
     return 0
 
 
+_CJS_SRC = """\
+const EventEmitter = require('events');
+
+class Command extends EventEmitter {
+  createCommand(name) { return new Command(name); }
+}
+
+class Help {
+  formatHelp(cmd) { return ''; }
+}
+
+class Internal {}
+
+function makeOption(flags) { return flags; }
+function privateHelper() { return 1; }
+
+exports.Command = Command;
+exports.makeOption = makeOption;
+module.exports.Help = Help;
+"""
+
+
+def test_commonjs_exports_are_public() -> int:
+    """CommonJS is most of npm; without recognising `exports.X = X` every such
+    file reports zero public symbols and contributes no seams at all."""
+    if not _HAVE_TS:
+        print("SKIP: typescript front-end (pip install modscan[typescript] to run)")
+        return 0
+
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "command.js"), "w", encoding="utf-8") as fh:
+            fh.write(_CJS_SRC)
+        cb = get_language_parser("typescript").parse_codebase(root)
+        module = cb.modules[0]
+
+        public_classes = {c.name for c in module.public_classes}
+        assert "Command" in public_classes, "exports.Command = Command not recognised"
+        assert "Help" in public_classes, "module.exports.Help = Help not recognised"
+        # a class that is never exported stays private
+        assert "Internal" not in public_classes
+
+        public_funcs = {f.name for f in module.public_functions}
+        assert "makeOption" in public_funcs
+        assert "privateHelper" not in public_funcs
+    return 0
+
+
 def test_generate_docs_typescript() -> int:
     """generate_docs(language='typescript') produces static docs (no execution)."""
     if not _HAVE_TS:
@@ -129,5 +176,6 @@ def test_generate_docs_typescript() -> int:
 if __name__ == "__main__":
     test_ts_and_js_registered()
     test_ts_parses_into_seams()
+    test_commonjs_exports_are_public()
     test_generate_docs_typescript()
     print("OK: typescript self-check passed")

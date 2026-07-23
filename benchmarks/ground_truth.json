@@ -115,6 +115,22 @@
           "justification": "Docs 'Validation - Validator classes': a reusable validator is written as a class extending the Validator base and implementing __call__."
         }
       ]
+    },
+    "commander": {
+      "version": "14.0.2",
+      "language": "typescript",
+      "docs": "https://github.com/tj/commander.js#readme",
+      "note": "First JavaScript target. CommonJS: its classes are exported with `exports.X = X`, not the ESM `export` keyword. Ships hand-written type declarations in typings/index.d.ts alongside the lib/*.js implementation, so the same concept appears twice - the label points at the implementation, where the class statement is.",
+      "extension_points": [
+        {
+          "id": "commander/lib/help:Help",
+          "justification": "Readme, help customisation: 'You can configure the help by modifying data properties and methods using .configureHelp(), or by subclassing Help using .createHelp().' Subclassing is named outright."
+        },
+        {
+          "id": "commander/lib/command:Command",
+          "justification": "Readme, createCommand: presented as an override point - 'you may override it to customise the new subcommand', i.e. return your own Command subclass for subcommands."
+        }
+      ]
     }
   }
 }

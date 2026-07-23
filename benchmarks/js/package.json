@@ -1,0 +1,9 @@
+{
+  "name": "modscan-benchmark-targets",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pinned JS/TS packages the moddability ranking benchmark scores against",
+  "devDependencies": {
+    "commander": "^14.0.2"
+  }
+}

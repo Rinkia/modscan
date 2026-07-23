@@ -35,7 +35,11 @@ if importlib.util.find_spec("mcp") is None:
     print("SKIP: mcp SDK not installed (pip install modscan[mcp])")
     raise SystemExit(0)
 
-from modscan.mcp_server import detect_extension_points_tool, mcp  # noqa: E402
+from modscan.mcp_server import (  # noqa: E402
+    audit_attack_surface_tool,
+    detect_extension_points_tool,
+    mcp,
+)
 
 
 def test_tool_is_registered() -> None:
@@ -76,7 +80,58 @@ def test_tool_ranks_an_abstract_base() -> None:
         assert {"id", "category", "score", "kind", "signals"} <= set(top)
 
 
+_AUDIT_SRC = '''\
+import pickle
+import subprocess
+
+
+def load(blob):
+    return pickle.loads(blob)
+
+
+def run(cmd):
+    return subprocess.run(cmd, shell=True)
+'''
+
+
+def test_audit_tool_reports_sinks_with_disclaimer() -> None:
+    """The security lens is exposed as its own tool, in its own vocabulary, and
+    the non-coverage disclaimer travels with the data — a client must not be able
+    to read the result as 'no vulnerabilities found'."""
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "app.py"), "w", encoding="utf-8") as fh:
+            fh.write(_AUDIT_SRC)
+
+        payload = audit_attack_surface_tool(root)
+        assert {"tool", "target", "disclaimer", "count", "sinks"} <= set(payload)
+        assert payload["disclaimer"], "the disclaimer must travel with the data"
+
+        ids = {s["id"] for s in payload["sinks"]}
+        assert "MS-SEC-PICKLE" in ids and "MS-SEC-SUBPROCESS" in ids, ids
+
+        # ranked most-dangerous-first, and the literal shell=True was elevated
+        assert payload["sinks"][0]["severity"] == "high"
+        subproc = next(s for s in payload["sinks"] if s["id"] == "MS-SEC-SUBPROCESS")
+        assert subproc["severity"] == "high", "literal shell=True should elevate"
+
+        # the security answer is never phrased in moddability terms
+        assert not any("score" in s for s in payload["sinks"])
+
+        assert len(audit_attack_surface_tool(root, limit=1)["sinks"]) == 1
+
+
+def test_empty_audit_still_carries_the_disclaimer() -> None:
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "safe.py"), "w", encoding="utf-8") as fh:
+            fh.write("x = 1\n")
+        payload = audit_attack_surface_tool(root)
+        assert payload["count"] == 0
+        assert payload["disclaimer"], "an empty result is not a clean bill of health"
+
+
 if __name__ == "__main__":
     test_tool_is_registered()
     test_tool_ranks_an_abstract_base()
+    test_audit_tool_reports_sinks_with_disclaimer()
+    test_empty_audit_still_carries_the_disclaimer()
     print("OK: mcp server self-check passed")

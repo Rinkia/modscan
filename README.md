@@ -169,7 +169,14 @@ sibling command maps that **attack surface** — `eval`/`exec`, `pickle`/`marsha
 ```bash
 modscan-audit ./path/to/project           # ranked Markdown report
 modscan-audit ./path/to/project --json    # machine-readable
+
+# Compare two snapshots: what execution sinks does a change introduce?
+modscan-audit --diff base.json pr.json
 ```
+
+The diff identifies a sink by `(id, module, call)` and compares counts, so moved
+code is never reported as a change — but a third `eval` added to a module that
+already had two is.
 
 It is **enumeration, not a vulnerability scan**: it shows where to look, it does
 not trace taint, match CVEs, or detect secrets — and an empty report is not a

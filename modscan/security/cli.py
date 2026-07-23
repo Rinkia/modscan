@@ -23,11 +23,13 @@ finds (an attack-surface map is informational; the reviewer decides).
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
 from modscan.security.detect import find_risk_sinks
 from modscan.security.report import render_json, render_markdown
+from modscan.security.surface_diff import diff_surfaces, render_surface_diff_markdown
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,7 +38,17 @@ def build_parser() -> argparse.ArgumentParser:
         description="Map a Python codebase's attack surface — where untrusted code "
         "or data can enter and execute. Enumeration only: no taint, CVEs, or secrets.",
     )
-    parser.add_argument("root", help="path to the source tree to scan")
+    parser.add_argument(
+        "root", nargs="?", help="path to the source tree to scan"
+    )
+    parser.add_argument(
+        "--diff",
+        nargs=2,
+        metavar=("BASE", "PR"),
+        help="compare two `--json` snapshots and report the execution sinks the "
+        "second one introduces (line numbers are ignored, so moved code is not a "
+        "change). Reports only — it does not fail on new sinks.",
+    )
     parser.add_argument(
         "--json", action="store_true", help="machine-readable JSON instead of Markdown"
     )
@@ -56,15 +68,43 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_diff(paths: list[str], label: str | None) -> int:
+    """Report the execution sinks the second snapshot introduces over the first."""
+    for path in paths:
+        if not os.path.isfile(path):
+            print(f"error: snapshot not found: {path}", file=sys.stderr)
+            return 2
+    try:
+        with open(paths[0], encoding="utf-8") as fh:
+            base = json.load(fh)
+        with open(paths[1], encoding="utf-8") as fh:
+            new = json.load(fh)
+    except json.JSONDecodeError as exc:
+        print(f"error: not a valid --json snapshot: {exc}", file=sys.stderr)
+        return 2
+
+    shown = label or (new.get("target") if isinstance(new, dict) else None) or "target"
+    print(render_surface_diff_markdown(diff_surfaces(base, new), shown), end="")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if not os.path.isdir(args.root):
-        print(f"error: not a directory: {args.root}", file=sys.stderr)
+    if not args.diff and not args.root:
+        print("error: provide a path to scan, or --diff BASE PR", file=sys.stderr)
         return 2
+
     # The report uses em-dashes; a Windows cp1252 console would crash on them.
     # Force UTF-8 stdout, as the moddability CLI does.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+
+    if args.diff:
+        return _run_diff(args.diff, args.label)
+
+    if not os.path.isdir(args.root):
+        print(f"error: not a directory: {args.root}", file=sys.stderr)
+        return 2
 
     sinks = find_risk_sinks(args.root, exclude=tuple(args.exclude))
     label = args.label or os.path.basename(os.path.abspath(args.root))

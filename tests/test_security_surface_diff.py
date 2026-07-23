@@ -28,6 +28,7 @@ from modscan.security.cli import main  # noqa: E402
 from modscan.security.surface_diff import (  # noqa: E402
     SURFACE_DIFF_MARKER,
     diff_surfaces,
+    introduced_at_or_above,
     render_surface_diff_markdown,
 )
 
@@ -130,6 +131,56 @@ def test_cli_diff_and_scan_still_work() -> None:
     assert main([]) == 2  # neither a path nor --diff
 
 
+def test_fail_on_threshold_selection() -> None:
+    """'high' must not fire on the routine medium tier — the whole point of the
+    default (measured: medium is dominated by __reduce__/dynamic-import/subprocess)."""
+    diff = diff_surfaces(
+        _snap([]),
+        _snap([
+            _sink("MS-SEC-EVAL", "m", "eval", 1, severity="high"),
+            _sink("MS-SEC-DYNIMPORT", "m", "importlib.import_module", 2, severity="medium"),
+            _sink("MS-SEC-ENTRYPOINTS", "m", "x.entry_points", 3, severity="low"),
+        ]),
+    )
+    assert introduced_at_or_above(diff, "none") == []
+    assert [c.id for c in introduced_at_or_above(diff, "high")] == ["MS-SEC-EVAL"]
+    assert len(introduced_at_or_above(diff, "medium")) == 2
+    assert len(introduced_at_or_above(diff, "low")) == 3
+
+    # a medium-only change must NOT trip the default gate
+    medium_only = diff_surfaces(
+        _snap([]), _snap([_sink("MS-SEC-DYNIMPORT", "m", "importlib.import_module", 2,
+                                severity="medium")])
+    )
+    assert introduced_at_or_above(medium_only, "high") == []
+
+
+def test_cli_fail_on_exit_codes() -> None:
+    old = sys.stdout
+    with tempfile.TemporaryDirectory() as root:
+        base_p = os.path.join(root, "base.json")
+        pr_p = os.path.join(root, "pr.json")
+        with open(base_p, "w", encoding="utf-8") as fh:
+            json.dump(_snap([]), fh)
+        with open(pr_p, "w", encoding="utf-8") as fh:
+            json.dump(_snap([_sink("MS-SEC-EVAL", "m", "eval", 1)]), fh)
+
+        def run(args: list[str]) -> int:
+            buf = io.StringIO()
+            sys.stdout = buf
+            try:
+                return main(args)
+            finally:
+                sys.stdout = old
+
+        # default is report-only, even with a high sink introduced
+        assert run(["--diff", base_p, pr_p]) == 0
+        # gate on -> fails
+        assert run(["--diff", base_p, pr_p, "--fail-on", "high"]) == 1
+        # no new sinks -> passes even with the gate on
+        assert run(["--diff", pr_p, pr_p, "--fail-on", "high"]) == 0
+
+
 if __name__ == "__main__":
     test_added_occurrence_of_existing_sink_is_caught()
     test_line_shift_alone_is_not_a_change()
@@ -137,4 +188,6 @@ if __name__ == "__main__":
     test_accepts_bare_list_shape()
     test_render_carries_marker_and_disclaimer()
     test_cli_diff_and_scan_still_work()
+    test_fail_on_threshold_selection()
+    test_cli_fail_on_exit_codes()
     print("OK: attack-surface diff self-check passed")

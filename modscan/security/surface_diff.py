@@ -35,6 +35,13 @@ SURFACE_DIFF_MARKER = "<!-- modscan-attack-surface-diff -->"
 
 _SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
+# Thresholds a gate can fail on. "high" is the recommended default: measured
+# across real packages, the medium tier is dominated by routine `__reduce__`,
+# dynamic imports and subprocess calls — normal code for a plugin host — while
+# the high tier (eval/exec/pickle.loads/yaml.load/os.system) is rare and a new
+# occurrence genuinely warrants a review conversation.
+FAIL_ON_CHOICES = ("none", "high", "medium", "low")
+
 _DISCLAIMER = (
     "> **New attack surface to review — NOT a vulnerability verdict.** This "
     "compares enumerated execution sinks between two snapshots. It does **not** "
@@ -120,6 +127,20 @@ def diff_surfaces(base: dict | list, new: dict | list) -> SurfaceDiff:
         introduced=_changes(new_counts - base_counts, meta),
         removed=_changes(base_counts - new_counts, meta),
     )
+
+
+def introduced_at_or_above(diff: SurfaceDiff, threshold: str) -> list[SurfaceChange]:
+    """Introduced sinks at least as severe as `threshold`.
+
+    ``"none"`` never selects anything (report-only). ``"high"`` selects only high;
+    ``"medium"`` selects high+medium; ``"low"`` selects everything.
+    """
+    if threshold == "none":
+        return []
+    limit = _SEVERITY_ORDER.get(threshold)
+    if limit is None:
+        return []
+    return [c for c in diff.introduced if _SEVERITY_ORDER.get(c.severity, 9) <= limit]
 
 
 def _rows(changes: list[SurfaceChange]) -> list[str]:

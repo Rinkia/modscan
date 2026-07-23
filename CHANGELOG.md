@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **More process sinks, and `shell=True` now raises severity.** Cross-checking the
+  security lens against Bandit on real packages surfaced a genuine gap: `os.popen`,
+  `os.startfile`, the `os.exec*`/`os.spawn*` family and `commands.getoutput` were
+  not catalogued. They are now, split the way Bandit splits B605 from B606 — calls
+  that hand a string to a shell (`os.system`, `os.popen`) rate **high**, calls that
+  launch a program without one rate **medium**. A `subprocess.*` call passing a
+  literal `shell=True` is elevated to **high** (only a literal counts; a variable
+  could be either, and guessing would inflate severity on evidence the parser does
+  not have). With the gate's `fail-on: high` default, this means a newly-introduced
+  `shell=True` now fails a PR while an ordinary `subprocess.run` still does not.
+
+### Note
+
+- A modscan upgrade that adds catalogue entries can make the attack-surface gate
+  report sinks that were always in the code — new to the detector, not to the
+  codebase. Pin the Action's `modscan-version` for a baseline that only moves when
+  you choose.
+
 ## [0.1.6] - 2026-07-23
 
 The security lens grows a memory: it can now compare two snapshots and gate a

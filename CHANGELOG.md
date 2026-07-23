@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-07-23
+
+The security lens grows a memory: it can now compare two snapshots and gate a
+pull request on the execution sinks it introduces.
+
 ### Added
 
 - **Attack-surface gate GitHub Action** (`Rinkia/modscan/attack-surface`). On a
@@ -26,8 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   snapshots and report the execution sinks the second one *introduces*. Sinks are
   identified by `(id, module, call)` and compared as a counted multiset, so moved
   code never registers as a change while a third `eval` added to a module that
-  already had two still shows up. Reports only — failing CI on new sinks comes
-  next. The report carries its own sticky-comment marker, distinct from the
+  already had two still shows up. On its own it only reports; `--fail-on` turns it
+  into a gate. The report carries its own sticky-comment marker, distinct from the
   breaking-change gate's, so a repo running both gets two independent comments.
 
 ## [0.1.5] - 2026-07-22
@@ -315,7 +320,8 @@ Initial MVP: the full pipeline, end to end.
   skeletons from the manifest.
 - Apache-2.0 licensing.
 
-[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/Rinkia/modscan/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Rinkia/modscan/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Rinkia/modscan/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/Rinkia/modscan/compare/v0.1.2...v0.1.3

@@ -170,6 +170,9 @@ sibling command maps that **attack surface** — `eval`/`exec`, `pickle`/`marsha
 modscan-audit ./path/to/project           # ranked Markdown report
 modscan-audit ./path/to/project --json    # machine-readable
 
+# TypeScript/JavaScript too (needs: pip install modscan[typescript])
+modscan-audit ./src --language typescript
+
 # Compare two snapshots: what execution sinks does a change introduce?
 modscan-audit --diff base.json pr.json
 ```

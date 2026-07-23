@@ -178,6 +178,21 @@ The diff identifies a sink by `(id, module, call)` and compares counts, so moved
 code is never reported as a change — but a third `eval` added to a module that
 already had two is.
 
+To gate pull requests on **newly-introduced** sinks, add the Action:
+
+```yaml
+- uses: actions/checkout@v5
+  with: { fetch-depth: 0 }
+- uses: Rinkia/modscan/attack-surface@v0.1.5
+  with: { path: your_package }        # fail-on: high (default)
+```
+
+It fails only on the *delta* — sinks already on the base branch never fail the
+check. `fail-on` defaults to `high` (`eval`/`exec`/`pickle.loads`/`yaml.load`/
+`os.system`), because the medium tier is mostly routine `__reduce__`,
+dynamic-import and subprocess code. A passing check is **not** a clean bill of
+health. (MODScan runs this on itself.)
+
 It is **enumeration, not a vulnerability scan**: it shows where to look, it does
 not trace taint, match CVEs, or detect secrets — and an empty report is not a
 clean bill of health. It maps surface to review by hand.

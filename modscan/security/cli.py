@@ -16,8 +16,12 @@
 
 A sibling entry point, separate from `modscan`, so the security framing never
 mixes with the moddability UX. Offline and free: it runs the parser + sink
-detector, never the LLM. It is a report, not a gate — it exits 0 whatever it
-finds (an attack-surface map is informational; the reviewer decides).
+detector, never the LLM.
+
+Scanning is always a report — an attack-surface map is informational and exits 0
+whatever it finds. Only `--diff` can fail, and only when explicitly asked with
+`--fail-on`, which is how the CI gate turns "sinks were introduced" into a
+failing check.
 """
 
 from __future__ import annotations
@@ -29,7 +33,12 @@ import sys
 
 from modscan.security.detect import find_risk_sinks
 from modscan.security.report import render_json, render_markdown
-from modscan.security.surface_diff import diff_surfaces, render_surface_diff_markdown
+from modscan.security.surface_diff import (
+    FAIL_ON_CHOICES,
+    diff_surfaces,
+    introduced_at_or_above,
+    render_surface_diff_markdown,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -47,7 +56,16 @@ def build_parser() -> argparse.ArgumentParser:
         metavar=("BASE", "PR"),
         help="compare two `--json` snapshots and report the execution sinks the "
         "second one introduces (line numbers are ignored, so moved code is not a "
-        "change). Reports only — it does not fail on new sinks.",
+        "change). Reports only unless --fail-on is given.",
+    )
+    parser.add_argument(
+        "--fail-on",
+        choices=FAIL_ON_CHOICES,
+        default="none",
+        help="with --diff, exit 1 when a sink of at least this severity is "
+        "introduced (default: none — report only). 'high' is the recommended gate "
+        "setting: the medium tier is mostly routine __reduce__/dynamic-import/"
+        "subprocess code.",
     )
     parser.add_argument(
         "--json", action="store_true", help="machine-readable JSON instead of Markdown"
@@ -68,8 +86,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _run_diff(paths: list[str], label: str | None) -> int:
-    """Report the execution sinks the second snapshot introduces over the first."""
+def _run_diff(paths: list[str], label: str | None, fail_on: str = "none") -> int:
+    """Report the execution sinks the second snapshot introduces over the first.
+
+    Returns 1 when `fail_on` is set and a sink at least that severe was
+    introduced — the signal a CI gate keys off. Otherwise 0.
+    """
     for path in paths:
         if not os.path.isfile(path):
             print(f"error: snapshot not found: {path}", file=sys.stderr)
@@ -83,8 +105,18 @@ def _run_diff(paths: list[str], label: str | None) -> int:
         print(f"error: not a valid --json snapshot: {exc}", file=sys.stderr)
         return 2
 
+    diff = diff_surfaces(base, new)
     shown = label or (new.get("target") if isinstance(new, dict) else None) or "target"
-    print(render_surface_diff_markdown(diff_surfaces(base, new), shown), end="")
+    print(render_surface_diff_markdown(diff, shown), end="")
+
+    blocking = introduced_at_or_above(diff, fail_on)
+    if blocking:
+        print(
+            f"error: {sum(c.count for c in blocking)} newly-introduced sink(s) at or "
+            f"above severity '{fail_on}' — review before merging.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
@@ -100,7 +132,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
 
     if args.diff:
-        return _run_diff(args.diff, args.label)
+        return _run_diff(args.diff, args.label, args.fail_on)
 
     if not os.path.isdir(args.root):
         print(f"error: not a directory: {args.root}", file=sys.stderr)

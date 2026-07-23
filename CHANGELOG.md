@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Attack-surface gate GitHub Action** (`Rinkia/modscan/attack-surface`). On a
+  pull request it audits the PR and the base branch, diffs them, sticky-comments
+  the result, and fails the check when the PR **introduces** new execution sinks.
+  It gates the *delta*, never the standing surface — sinks already on base never
+  fail it. `fail-on` defaults to **high** (`eval`/`exec`/`pickle.loads`/
+  `yaml.load`/`os.system`): measured across real packages, the medium tier is
+  dominated by routine `__reduce__`, dynamic-import and subprocess code, so gating
+  on it is noisy for exactly the plugin hosts MODScan serves. No LLM, no API key,
+  no committed snapshot. MODScan runs it on itself
+  (`.github/workflows/attack-surface-gate.yml`).
+- **`modscan-audit --fail-on {high,medium,low,none}`** — with `--diff`, exit 1
+  when a sink at least that severe is introduced. Defaults to `none`: the CLI
+  stays a report, and the policy lives in the gate.
 - **`modscan-audit --diff BASE PR`** — compare two `--json` attack-surface
   snapshots and report the execution sinks the second one *introduces*. Sinks are
   identified by `(id, module, call)` and compared as a counted multiset, so moved

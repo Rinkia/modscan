@@ -169,6 +169,25 @@ def _handle_decl(node, src: bytes, module: ModuleInfo, exported: bool) -> None:
             module.imports.append(imp)
 
 
+_DECLARATION_SUFFIXES = (".d.ts", ".d.mts", ".d.cts")
+
+
+def _is_declaration_file(path: str) -> bool:
+    """True for a TypeScript declaration file (``*.d.ts``).
+
+    A declaration file *declares* types for code defined elsewhere; it holds no
+    implementation. Scanning it produces a phantom copy of every symbol —
+    commander declares `Command` and `Help` in `typings/index.d.ts` as well as
+    defining them in `lib/`, so each seam appeared twice — and its option-bag
+    interfaces (`ParseOptions`, `HelpContext`, `OutputConfiguration`) outranked
+    the classes the documentation actually tells you to subclass.
+
+    Skipping them matches the rule the benchmark labels already follow: a seam is
+    recorded where it is *defined*, in the module holding the `class` statement.
+    """
+    return path.endswith(_DECLARATION_SUFFIXES)
+
+
 def _qualname(root: str, path: str) -> str:
     rel = os.path.relpath(path, root).replace(os.sep, "/")
     base, _ext = os.path.splitext(rel)
@@ -262,6 +281,8 @@ class TypeScriptLanguageParser:
         root = os.path.abspath(root)
         codebase = Codebase(root=root)
         for path in walk_source_files(root, _ALL_EXTS, skip_paths=exclude):
+            if _is_declaration_file(path):
+                continue
             ext = os.path.splitext(path)[1]
             parser = tsx_parser if ext in _TSX_EXTS else ts_parser
             codebase.modules.append(_parse_file(path, root, parser))

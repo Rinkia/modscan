@@ -323,10 +323,11 @@ figure says so plainly:
 
 | Target | Candidates | Labels | Rank of each label | recall@10 |
 |---|---|---|---|---|
-| commander 14.0.2 | 25 | 2 | 11, 15 | **0/2** |
+| commander 14.0.2 (baseline) | 25 | 2 | 11, 15 | **0/2** |
+| commander 14.0.2 (current) | 11 | 2 | 3, 7 | **2/2** |
 
-Both labelled seams land just outside the top ten. What occupies the ranking
-above them is the finding:
+At the baseline both labelled seams landed just outside the top ten. What
+occupied the ranking above them was the finding — since resolved, below:
 
 **TypeScript `interface` declarations are scored as abstract classes.** The
 front-end treats an interface as "a pure contract to implement", which is
@@ -336,11 +337,41 @@ friends — option bags from `typings/index.d.ts` — each scoring 0.70 with
 *"meant to be subclassed"*, while the two classes the documentation actually
 tells you to subclass sit at 0.10.
 
-This is recorded rather than fixed here, for the same reason the Python signals
+This was recorded rather than fixed there, for the same reason the Python signals
 were: changing it is a **ranking change**, and a ranking change is judged by the
 benchmark, in its own pull request, against this baseline. Fixing it in the
 change that introduced the labels would be exactly the circularity the gate on
 this directory exists to prevent.
+
+### Resolved: `.d.ts` declaration files are not scanned
+
+*"The interfaces flooding the top come from a type-declaration file, not from
+code."* **Measured, adopted.**
+
+Two candidate fixes were swept against the baseline before either was written:
+
+| Variant | commander | Aggregate | Python targets |
+|---|---|---|---|
+| baseline | 0/2 (ranks 11, 15) | 9/22 | — |
+| **B** — `interface` no longer implies abstract | 2/2 (ranks 3, 7) | **11/22** | unchanged |
+| **C** — skip `*.d.ts` | 2/2 (ranks 3, 7) | **11/22** | unchanged |
+| D — both | 2/2 (ranks 3, 7) | 11/22 | unchanged |
+
+They are **identical**, which is itself the finding: both were describing the
+same phenomenon, and combining them adds nothing.
+
+**C is the one adopted**, because B is right about commander for the wrong
+reason. A hand-written TypeScript interface genuinely *is* a contract to
+implement — the front-end's own fixture has `RenderPlugin`, and B would demote
+it. What was actually wrong was reading a **declaration file** at all: a `.d.ts`
+declares types for code defined elsewhere, so commander's `Command` and `Help`
+were each counted twice, and option bags that exist only as declarations became
+candidates. Skipping declaration files also matches the rule these labels already
+follow — a seam is recorded where it is *defined*.
+
+Commander's candidate count drops 25 → 11 as the phantom copies disappear, its
+median rank goes 13 → 5, and no Python target moves: click stays 4/4, pluggy 3/3.
+**Aggregate 9/22 → 11/22.**
 
 A second, smaller trap the target exposed: commander ships hand-written type
 declarations beside the implementation, so `Command` and `Help` each appear

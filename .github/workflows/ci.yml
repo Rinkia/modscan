@@ -54,7 +54,9 @@ jobs:
         run: |
           changed=$(git diff --name-only "$BASE" "$HEAD")
           labels=$(echo "$changed" | grep -c '^benchmarks/ground_truth\.json$' || true)
-          ranking=$(echo "$changed" | grep -cE '^modscan/(detector|graph)\.py$' || true)
+          # Language front-ends decide what even becomes a candidate, so a
+          # front-end change can flatter a score exactly as a weight change can.
+          ranking=$(echo "$changed" | grep -cE '^modscan/(detector|graph)\.py$|^modscan/languages/.*\.py$' || true)
           if [ "$labels" -gt 0 ] && [ "$ranking" -gt 0 ]; then
             echo "::error::This PR changes benchmarks/ground_truth.json AND the ranking code."
             echo "Split it: land the label change on its own, justified by the target's"

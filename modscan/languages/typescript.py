@@ -32,6 +32,7 @@ covered; the rest is a follow-up if a real target needs it.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 
 from modscan.fsutil import walk_source_files
 from modscan.languages.base import register_language
@@ -174,6 +175,61 @@ def _qualname(root: str, path: str) -> str:
     return base
 
 
+def _commonjs_exports(tree, src: bytes) -> set[str]:
+    """Names a CommonJS module exports: ``exports.X = X`` / ``module.exports = {X}``.
+
+    Most of npm is still CommonJS, where nothing carries the ESM ``export``
+    keyword. Without this, every such file reports zero public symbols and so
+    contributes no seams at all — the declarations are found, then discarded as
+    private.
+    """
+    names: set[str] = set()
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        stack.extend(node.children)
+        if node.type != "assignment_expression":
+            continue
+        left = node.child_by_field_name("left")
+        right = node.child_by_field_name("right")
+        if left is None or left.type != "member_expression":
+            continue
+        obj = left.child_by_field_name("object")
+        prop = left.child_by_field_name("property")
+        if obj is None or prop is None:
+            continue
+        obj_text = _text(obj, src)
+
+        # exports.Command = Command  /  module.exports.Command = Command
+        if obj_text in ("exports", "module.exports"):
+            names.add(_text(prop, src))
+        # module.exports = Command  /  module.exports = { Command, Option }
+        elif obj_text == "module" and _text(prop, src) == "exports" and right is not None:
+            if right.type == "identifier":
+                names.add(_text(right, src))
+            elif right.type == "object":
+                for entry in right.named_children:
+                    # { Command } shorthand, or { Command: Command }
+                    key = entry.child_by_field_name("key")
+                    if key is not None:
+                        names.add(_text(key, src))
+                    elif entry.type == "shorthand_property_identifier":
+                        names.add(_text(entry, src))
+    return names
+
+
+def _mark_exported(module: ModuleInfo, names: set[str]) -> None:
+    """Flip is_public on declarations a CommonJS export statement names."""
+    if not names:
+        return
+    module.classes = [
+        replace(c, is_public=True) if c.name in names else c for c in module.classes
+    ]
+    module.functions = [
+        replace(f, is_public=True) if f.name in names else f for f in module.functions
+    ]
+
+
 def _parse_file(path: str, root: str, parser) -> ModuleInfo:
     module = ModuleInfo(qualname=_qualname(root, path), path=path)
     try:
@@ -191,6 +247,8 @@ def _parse_file(path: str, root: str, parser) -> ModuleInfo:
                 _handle_decl(inner, src, module, exported=True)
         else:
             _handle_decl(child, src, module, exported=False)
+
+    _mark_exported(module, _commonjs_exports(tree, src))
     return module
 
 

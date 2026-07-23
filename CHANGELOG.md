@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-07-23
+
+A third language, a second lens over MCP, and two TypeScript front-end defects
+found by pointing the benchmark at real packages.
+
 ### Added
 
 - **Java front-end** — `modscan detect --language java` (and the docgen and
@@ -53,6 +58,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   could be either, and guessing would inflate severity on evidence the parser does
   not have). With the gate's `fail-on: high` default, this means a newly-introduced
   `shell=True` now fails a PR while an ordinary `subprocess.run` still does not.
+
+### Fixed
+
+- **CommonJS exports are recognised.** The TypeScript/JavaScript front-end marked
+  a symbol public only from the ESM `export` keyword, so every CommonJS file —
+  most of npm — reported zero public symbols and contributed no extension points
+  at all. `exports.X = X`, `module.exports.X = X`, `module.exports = X` and
+  `module.exports = { X, Y }` now mark the named declarations public. Found by
+  scanning commander, whose entire `lib/` implementation was invisible.
+- **`.d.ts` declaration files are no longer scanned.** A declaration file
+  declares types for code defined elsewhere, so scanning it produced a phantom
+  copy of every symbol, and option-bag interfaces that exist only as declarations
+  outranked the classes a project's documentation actually tells you to subclass.
+  Measured on the commander benchmark target: recall@10 0/2 → 2/2, candidates
+  25 → 11, with no other target affected.
 
 ### Note
 
@@ -374,7 +394,8 @@ Initial MVP: the full pipeline, end to end.
   skeletons from the manifest.
 - Apache-2.0 licensing.
 
-[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/Rinkia/modscan/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/Rinkia/modscan/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/Rinkia/modscan/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/Rinkia/modscan/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/Rinkia/modscan/compare/v0.1.3...v0.1.4

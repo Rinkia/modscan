@@ -29,3 +29,6 @@ modding-docs/
 
 # Local scratchpad for throwaway spikes and analysis (never committed)
 scratchpad/
+
+# Installed JS toolchain + scan targets for the TS cross-check (npm install)
+node_modules/

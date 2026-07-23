@@ -139,6 +139,39 @@ def test_commonjs_exports_are_public() -> int:
     return 0
 
 
+def test_declaration_files_are_not_scanned() -> int:
+    """A .d.ts declares types for code defined elsewhere, so scanning it yields a
+    phantom copy of every symbol — and its option-bag interfaces outrank the
+    classes the docs actually tell you to subclass."""
+    if not _HAVE_TS:
+        print("SKIP: typescript front-end (pip install modscan[typescript]  to run)")
+        return 0
+
+    impl = "class Command {\n  run() {}\n}\nexports.Command = Command;\n"
+    decl = (
+        "export declare class Command { run(): void; }\n"
+        "export interface ParseOptions { from?: string }\n"
+    )
+    with tempfile.TemporaryDirectory() as root:
+        os.makedirs(os.path.join(root, "lib"))
+        with open(os.path.join(root, "lib", "command.js"), "w", encoding="utf-8") as fh:
+            fh.write(impl)
+        with open(os.path.join(root, "index.d.ts"), "w", encoding="utf-8") as fh:
+            fh.write(decl)
+
+        cb = get_language_parser("typescript").parse_codebase(root)
+        modules = {m.qualname for m in cb.modules}
+        assert "lib/command" in modules
+        assert not [m for m in modules if m.endswith(".d")], modules
+
+        # the implementation is found exactly once, and the declaration-only
+        # option bag never becomes a candidate
+        names = [c.name for m in cb.modules for c in m.public_classes]
+        assert names.count("Command") == 1, names
+        assert "ParseOptions" not in names, names
+    return 0
+
+
 def test_generate_docs_typescript() -> int:
     """generate_docs(language='typescript') produces static docs (no execution)."""
     if not _HAVE_TS:
@@ -177,5 +210,6 @@ if __name__ == "__main__":
     test_ts_and_js_registered()
     test_ts_parses_into_seams()
     test_commonjs_exports_are_public()
+    test_declaration_files_are_not_scanned()
     test_generate_docs_typescript()
     print("OK: typescript self-check passed")

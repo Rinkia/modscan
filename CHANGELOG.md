@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Java front-end** — `modscan detect --language java` (and the docgen and
+  security paths that follow the language registry). Java maps onto the shared
+  model more directly than any front-end so far: `class`, `interface` and
+  `abstract class` are already its vocabulary, `extends`/`implements` are bases,
+  annotations play the part decorators do elsewhere, and visibility comes from
+  the explicit `public` modifier rather than being inferred. Generic bases are
+  reduced to their bare name (`Core<T>` -> `Core`), annotation arguments are
+  dropped (`@Plugin(name="x")` -> `Plugin`), and nested classes are deliberately
+  not emitted as top-level seams — an inner class is reached through its outer
+  one. Optional dependency: `pip install modscan[java]`.
+
 - **The security lens is exposed over MCP** — `modscan-mcp` gains an
   `audit_attack_surface` tool beside `detect_extension_points`, so an AI client
   can map where untrusted code enters as well as where a codebase is extensible.

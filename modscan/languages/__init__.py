@@ -32,6 +32,7 @@ from modscan.languages import python as _python  # noqa: F401 — registers "pyt
 from modscan.languages import (  # noqa: F401 — registers "typescript"/"javascript"
     typescript as _typescript,
 )
+from modscan.languages import java as _java  # noqa: F401 — registers "java"
 
 __all__ = [
     "LanguageParser",

@@ -50,6 +50,15 @@ class SinkSpec:
     category: str
     severity: str
     confidence: str
+    # True for the subprocess family, where passing shell=True hands the argument
+    # to a shell and turns a contained call into command injection surface. The
+    # detector raises the severity to high when it sees that keyword — the same
+    # distinction Bandit draws between B602 (shell=True) and B603 (no shell).
+    elevate_on_shell: bool = False
+
+    def elevated(self) -> "SinkSpec":
+        """This spec at high severity — used when shell=True is present."""
+        return SinkSpec(self.id, self.category, HIGH, self.confidence, self.elevate_on_shell)
 
 
 @dataclass(frozen=True)
@@ -87,13 +96,37 @@ _SINKS: dict[str, SinkSpec] = {
     "marshal.loads": SinkSpec("MS-SEC-MARSHAL", DESERIALIZATION, HIGH, MEDIUM),
     "marshal.load": SinkSpec("MS-SEC-MARSHAL", DESERIALIZATION, HIGH, MEDIUM),
     "yaml.load": SinkSpec("MS-SEC-YAML", DESERIALIZATION, HIGH, HIGH),
-    # process / shell
+    # process / shell — split by whether a shell is involved. os.system/os.popen
+    # hand a string to a shell (high); the exec/spawn family and os.startfile
+    # launch a program without one (medium), mirroring Bandit's B605 vs B606.
     "os.system": SinkSpec("MS-SEC-OSSYSTEM", PROCESS, HIGH, HIGH),
-    "subprocess.Popen": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM),
-    "subprocess.call": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM),
-    "subprocess.run": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM),
-    "subprocess.check_call": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM),
-    "subprocess.check_output": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.popen": SinkSpec("MS-SEC-OSSYSTEM", PROCESS, HIGH, HIGH),
+    "commands.getoutput": SinkSpec("MS-SEC-OSSYSTEM", PROCESS, HIGH, MEDIUM),
+    "commands.getstatusoutput": SinkSpec("MS-SEC-OSSYSTEM", PROCESS, HIGH, MEDIUM),
+    "os.startfile": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execl": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execle": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execlp": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execlpe": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execv": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execve": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execvp": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.execvpe": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnl": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnle": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnlp": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnlpe": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnv": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnve": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnvp": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.spawnvpe": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.posix_spawn": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "os.posix_spawnp": SinkSpec("MS-SEC-STARTPROCESS", PROCESS, MEDIUM, MEDIUM),
+    "subprocess.Popen": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM, True),
+    "subprocess.call": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM, True),
+    "subprocess.run": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM, True),
+    "subprocess.check_call": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM, True),
+    "subprocess.check_output": SinkSpec("MS-SEC-SUBPROCESS", PROCESS, MEDIUM, MEDIUM, True),
 }
 
 # Dynamic code-loading seams — the loader family MODScan already knows, re-framed

@@ -74,6 +74,48 @@ def _write_fixture(root: str) -> None:
         fh.write(_FIXTURE)
 
 
+_SHELL_FIXTURE = '''\
+import os
+import subprocess
+
+
+def spawn(cmd, url):
+    subprocess.run(cmd, shell=True)       # elevated to high
+    subprocess.run(cmd)                   # stays medium
+    subprocess.run(cmd, shell=flag)       # non-literal -> not elevated
+    os.popen(cmd)                         # shell -> high
+    os.system(cmd)                        # shell -> high
+    os.startfile(url)                     # no shell -> medium
+    os.execv(cmd, [])                     # no shell -> medium
+'''
+
+
+def test_shell_true_elevates_severity() -> None:
+    """shell=True turns a contained subprocess call into command-injection
+    surface — the Bandit B602/B603 distinction. Only a *literal* True counts."""
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "sh.py"), "w", encoding="utf-8") as fh:
+            fh.write(_SHELL_FIXTURE)
+        sinks = find_risk_sinks(root)
+        subs = sorted(
+            (s for s in sinks if s.id == "MS-SEC-SUBPROCESS"), key=lambda s: s.lineno
+        )
+        assert [s.severity for s in subs] == ["high", "medium", "medium"], [
+            (s.lineno, s.severity) for s in subs
+        ]
+
+        by_id = {s.id: s for s in sinks}
+        assert by_id["MS-SEC-OSSYSTEM"].severity == "high"       # os.popen / os.system
+        assert by_id["MS-SEC-STARTPROCESS"].severity == "medium"  # startfile / execv
+
+
+def test_process_sinks_bandit_parity() -> None:
+    """Gaps found by cross-checking against Bandit (B605/B606) are covered."""
+    for call in ("os.popen", "os.startfile", "os.execv", "os.spawnv", "os.posix_spawn"):
+        assert match_call(call) is not None, call
+    assert match_call("os.path.join") is None  # benign os.* still not a sink
+
+
 def test_catalog_integrity() -> None:
     specs = all_specs()
     ids = [s.id for s in specs]
@@ -124,6 +166,8 @@ def test_detects_planted_sinks_not_benign() -> None:
 
 
 if __name__ == "__main__":
+    test_shell_true_elevates_severity()
+    test_process_sinks_bandit_parity()
     test_catalog_integrity()
     test_qualifier_keyed_matching()
     test_detects_planted_sinks_not_benign()

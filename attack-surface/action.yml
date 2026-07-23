@@ -10,6 +10,11 @@
 # This is an attack-surface map, NOT a vulnerability scan: no taint analysis, no
 # CVE matching, no secret detection. A passing check is not a clean bill of health.
 #
+# NOTE: both sides are scanned with the SAME modscan build, so a release that adds
+# catalogue entries can report sinks that were always in the code — they are new to
+# the detector, not to the codebase. Pin `modscan-version` if you want a baseline
+# that only moves when you choose.
+#
 # Consumer prerequisites (in the calling workflow):
 #   * checkout with `fetch-depth: 0` (the base branch must be reachable);
 #   * `permissions: pull-requests: write` and `GH_TOKEN` set, to comment.

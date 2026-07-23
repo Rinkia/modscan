@@ -45,11 +45,25 @@ def _first_string_arg(call: ast.Call) -> str | None:
     return None
 
 
+def _has_shell_true(call: ast.Call) -> bool:
+    """True if the call passes a literal ``shell=True``.
+
+    Only a literal counts: a variable could be either, and guessing would inflate
+    the severity on evidence the parser does not have.
+    """
+    return any(
+        kw.arg == "shell" and isinstance(kw.value, ast.Constant) and kw.value.value is True
+        for kw in call.keywords
+    )
+
+
 def _sink_from_call(call: ast.Call, module: str) -> RiskSink | None:
     dotted = _dotted(call.func)
     spec = match_call(dotted)
     if spec is None:
         return None
+    if spec.elevate_on_shell and _has_shell_true(call):
+        spec = spec.elevated()
     return RiskSink(
         id=spec.id, category=spec.category, severity=spec.severity,
         confidence=spec.confidence, module=module, dotted=dotted,

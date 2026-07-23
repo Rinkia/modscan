@@ -95,8 +95,47 @@ def median_rank(ranks: dict[str, int]) -> float:
 # --- the run ----------------------------------------------------------------
 
 
-def _skip_reason(target: str, pinned: str) -> str | None:
+JS_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "js", "node_modules")
+
+
+def _js_package_dir(target: str) -> str:
+    return os.path.join(JS_ROOT, target)
+
+
+def _js_version(target: str) -> str | None:
+    """Installed version from the package's own package.json, or None."""
+    manifest = os.path.join(_js_package_dir(target), "package.json")
+    try:
+        with open(manifest, encoding="utf-8") as fh:
+            return json.load(fh).get("version")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _skip_reason_js(target: str, pinned: str) -> str | None:
+    """Why a JS/TS target cannot be scored, or None if it can be."""
+    if not os.path.isdir(_js_package_dir(target)):
+        return f"not installed - cd benchmarks/js && npm install"
+    installed = _js_version(target)
+    if installed is None:
+        return f"no package.json version - cd benchmarks/js && npm install"
+    if installed != pinned:
+        return (
+            f"installed {installed}, labels are for {pinned} - "
+            f"cd benchmarks/js && npm install {target}@{pinned}"
+        )
+    try:
+        import tree_sitter  # noqa: F401
+        import tree_sitter_typescript  # noqa: F401
+    except ImportError:
+        return "tree-sitter not installed - pip install modscan[typescript]"
+    return None
+
+
+def _skip_reason(target: str, pinned: str, language: str = "python") -> str | None:
     """Why this target cannot be scored, or None if it can be."""
+    if language != "python":
+        return _skip_reason_js(target, pinned)
     try:
         importlib.import_module(target)
     except ImportError:
@@ -112,19 +151,36 @@ def _skip_reason(target: str, pinned: str) -> str | None:
     return None
 
 
-def rank_labels(target: str, labels: set[str]) -> tuple[dict[str, int], int]:
+def rank_labels(
+    target: str, labels: set[str], language: str = "python"
+) -> tuple[dict[str, int], int]:
     """Rank of every labelled point in the detector's output, plus the candidate count.
 
     A label the detector never surfaces is recorded at ``candidates + 1`` rather
     than dropped. Dropping it would let a change that loses a seam entirely make
     the median *improve*.
     """
-    root = os.path.dirname(importlib.import_module(target).__file__)
-    points = detect_extension_points(build_graph(parse_codebase(root)))
+    if language == "python":
+        root = os.path.dirname(importlib.import_module(target).__file__)
+        codebase = parse_codebase(root)
+    else:
+        # JS/TS targets live under benchmarks/js/node_modules. Their module
+        # qualnames are path-shaped ("lib/command"), so ids are target-qualified
+        # as "commander/lib/command:Command" - the same convention the Python
+        # side uses, and what keeps a label checkable against its own package.
+        from modscan.languages.base import get_language_parser
+        import modscan.languages.typescript  # noqa: F401  (registers the front-end)
+
+        codebase = get_language_parser("typescript").parse_codebase(_js_package_dir(target))
+    points = detect_extension_points(build_graph(codebase))
 
     ranks: dict[str, int] = {}
     for position, point in enumerate(points, start=1):
-        pid = normalise_id(target, point.seam.module, point.seam.name)
+        pid = (
+            normalise_id(target, point.seam.module, point.seam.name)
+            if language == "python"
+            else f"{target}/{point.seam.module}:{point.seam.name}"
+        )
         if pid in labels and pid not in ranks:
             ranks[pid] = position
 
@@ -155,13 +211,14 @@ def main() -> int:
 
     for name, target in sorted(targets.items()):
         pinned = target["version"]
-        reason = _skip_reason(name, pinned)
+        language = target.get("language", "python")
+        reason = _skip_reason(name, pinned, language)
         if reason:
             print(f"SKIP {name}: {reason}")
             continue
 
         labels = {p["id"] for p in target["extension_points"]}
-        ranks, candidates = rank_labels(name, labels)
+        ranks, candidates = rank_labels(name, labels, language)
 
         hits, total = recall_at_k(ranks)
         scored_hits += hits

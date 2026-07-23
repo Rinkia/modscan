@@ -315,6 +315,51 @@ first-class public API, re-exported from `pluggy/__init__.py`.
 A path-based penalty would demote the single most important seam in the package.
 If this heuristic is ever attempted, it must be measured against pluggy first.
 
+## The first JavaScript target: does the ranking cross languages?
+
+The five targets above are Python. `commander` 14.0.2 was added to ask whether
+the ranking means anything on a second language. **It does not yet**, and the
+figure says so plainly:
+
+| Target | Candidates | Labels | Rank of each label | recall@10 |
+|---|---|---|---|---|
+| commander 14.0.2 | 25 | 2 | 11, 15 | **0/2** |
+
+Both labelled seams land just outside the top ten. What occupies the ranking
+above them is the finding:
+
+**TypeScript `interface` declarations are scored as abstract classes.** The
+front-end treats an interface as "a pure contract to implement", which is
+reasonable in the abstract and wrong in practice: commander's top eight are
+`ParseOptions`, `HelpContext`, `OutputConfiguration`, `AddHelpTextContext` and
+friends — option bags from `typings/index.d.ts` — each scoring 0.70 with
+*"meant to be subclassed"*, while the two classes the documentation actually
+tells you to subclass sit at 0.10.
+
+This is recorded rather than fixed here, for the same reason the Python signals
+were: changing it is a **ranking change**, and a ranking change is judged by the
+benchmark, in its own pull request, against this baseline. Fixing it in the
+change that introduced the labels would be exactly the circularity the gate on
+this directory exists to prevent.
+
+A second, smaller trap the target exposed: commander ships hand-written type
+declarations beside the implementation, so `Command` and `Help` each appear
+twice — once in `lib/*.js`, once in `typings/index.d.ts`. Labels point at the
+implementation, where the `class` statement is, consistent with rule 3 below.
+
+### Running the JS/TS targets
+
+```bash
+cd benchmarks/js && npm install     # pins the targets; node_modules is gitignored
+pip install modscan[typescript]     # tree-sitter front-end
+python benchmarks/score.py
+```
+
+A JS/TS target is declared with `"language": "typescript"` in
+`ground_truth.json`; its version is read from the package's own `package.json`,
+and it is skipped with a notice if the installed version is not the pinned one.
+Ids are target-qualified path form — `commander/lib/help:Help`.
+
 ## Adding a target
 
 1. Pick a package with real documentation — the rule depends on it.

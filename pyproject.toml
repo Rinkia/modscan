@@ -40,6 +40,8 @@ openai = ["openai>=1.40"]
 typescript = ["tree-sitter>=0.21", "tree-sitter-typescript>=0.21"]
 gemini = ["google-generativeai>=0.8"]
 mcp = ["mcp>=1.0"]
+# Validating the security lens against Bandit — see security-crosscheck/.
+crosscheck = ["bandit>=1.7"]
 
 [project.urls]
 Homepage = "https://github.com/Rinkia/modscan"

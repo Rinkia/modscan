@@ -131,6 +131,43 @@
           "justification": "Readme, createCommand: presented as an override point - 'you may override it to customise the new subcommand', i.e. return your own Command subclass for subcommands."
         }
       ]
+    },
+    "junit-jupiter-api": {
+      "version": "5.11.3",
+      "language": "java",
+      "maven": "org.junit.jupiter:junit-jupiter-api",
+      "docs": "https://docs.junit.org/current/user-guide/ (Extension Model); justifications quote the Javadoc shipped in the 5.11.3 sources jar, which is version-matched to these labels",
+      "note": "First Java target. Labels are quoted from the package's own Javadoc at the pinned version rather than the 'current' web guide, so they stay checkable against exactly this source. PARTIAL LIST: the remaining lifecycle callbacks (AfterEachCallback, BeforeAllCallback, ...) are documented identically and are deliberately not all labelled. NOTE the tie problem: JUnit's extension interfaces are so uniformly shaped that 18 candidates tie at score 1.00, so which ten surface is decided by traversal order, not evidence.",
+      "extension_points": [
+        {
+          "id": "junit-jupiter-api/org.junit.jupiter.api.extension.Extension:Extension",
+          "justification": "Javadoc: 'Marker interface for all extensions. An Extension can be registered declaratively via @ExtendWith, programmatically via @RegisterExtension, or automatically via the ServiceLoader mechanism.' The interface every extension implements."
+        },
+        {
+          "id": "junit-jupiter-api/org.junit.jupiter.api.extension.ParameterResolver:ParameterResolver",
+          "justification": "Javadoc: 'ParameterResolver defines the API for Extensions that wish to dynamically resolve arguments for parameters at runtime.'"
+        },
+        {
+          "id": "junit-jupiter-api/org.junit.jupiter.api.extension.ExecutionCondition:ExecutionCondition",
+          "justification": "Javadoc: 'ExecutionCondition defines the Extension API for programmatic, conditional test execution.'"
+        },
+        {
+          "id": "junit-jupiter-api/org.junit.jupiter.api.extension.TestWatcher:TestWatcher",
+          "justification": "Javadoc: 'TestWatcher defines the API for Extensions that wish to process test results.'"
+        },
+        {
+          "id": "junit-jupiter-api/org.junit.jupiter.api.extension.BeforeEachCallback:BeforeEachCallback",
+          "justification": "Javadoc: 'BeforeEachCallback defines the API for Extensions that wish to provide additional behavior to tests before an individual test ... has been executed.'"
+        },
+        {
+          "id": "junit-jupiter-api/org.junit.jupiter.api.extension.TestInstancePostProcessor:TestInstancePostProcessor",
+          "justification": "Javadoc: 'TestInstancePostProcessor defines the API for Extensions that wish to post-process test instances.'"
+        },
+        {
+          "id": "junit-jupiter-api/org.junit.jupiter.api.extension.InvocationInterceptor:InvocationInterceptor",
+          "justification": "Javadoc: 'InvocationInterceptor defines the API for Extensions that wish to intercept calls to test code.'"
+        }
+      ]
     }
   }
 }

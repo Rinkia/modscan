@@ -207,9 +207,27 @@ modscan-audit ./path/to/project --json    # machine-readable
 # TypeScript/JavaScript too (needs: pip install modscan[typescript])
 modscan-audit ./src --language typescript
 
+# Java (needs: pip install modscan[java])
+modscan-audit ./src --language java
+
 # Compare two snapshots: what execution sinks does a change introduce?
 modscan-audit --diff base.json pr.json
 ```
+
+The Java catalog covers `ScriptEngine`/Groovy/SpEL evaluation,
+`ObjectInputStream`/`XMLDecoder`/XStream/SnakeYAML deserialization,
+`Runtime.exec`/`ProcessBuilder`, and `Class.forName`-style dynamic loading.
+Because Java has no bare `eval` and every sink is a method on some object, the
+receiver's **declared type** is resolved per file — so `yaml.load(s)` fires and
+`props.load(r)` does not.
+
+**Coverage is not equal across the three languages.** The Python and
+TypeScript catalogs are cross-checked against Bandit (27/27 in scope) and
+eslint-plugin-security (10/10); **the Java catalog is not yet validated against
+an external authority.** find-sec-bugs, the obvious candidate, analyses
+*bytecode*, and MODScan reads source — so that check needs either a source-level
+authority or a compile step, and neither is built. Treat the Java report as
+newer and less proven than the other two.
 
 The diff identifies a sink by `(id, module, call)` and compares counts, so moved
 code is never reported as a change — but a third `eval` added to a module that

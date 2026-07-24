@@ -24,6 +24,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prose. Nothing about the ranking changed; it just stopped presenting a tie as
   an ordering. The same disclosure was added to the benchmark's own numbers.
 
+- **`modscan-audit --language java`** — a Java risk-sink catalog, modelled on
+  find-sec-bugs and citing its detector names per entry. Covers `ScriptEngine` /
+  Groovy / SpEL evaluation, `ObjectInputStream` / `XMLDecoder` / XStream /
+  SnakeYAML deserialization, `Runtime.exec` / `ProcessBuilder`, and
+  `Class.forName`-style dynamic loading, plus `readObject` / `readResolve` /
+  `readExternal` *definitions* — Java's counterpart to Python's `__reduce__`.
+  Java has no bare `eval`, so the receiver's declared type is resolved per file:
+  `yaml.load(s)` fires, `props.load(r)` does not. Java's process API does not
+  use a shell, so `Runtime.exec` sits at medium and is elevated to high only when
+  the command array literally names one — the analogue of `shell=True`.
+  **Unlike the Python and TypeScript catalogs, this one is not yet cross-checked
+  against an external authority**; find-sec-bugs analyses bytecode while MODScan
+  reads source. Needs `pip install modscan[java]`.
+
 ### Fixed
 
 - **`@overload` stubs no longer report a symbol several times.** `typing.overload`

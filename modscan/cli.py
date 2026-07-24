@@ -42,6 +42,7 @@ from modscan.providers import (
     get_provider,
 )
 from modscan.providers.base import DEFAULT_MAX_TOKENS
+from modscan import __version__
 from modscan.scaffold import (
     load_manifest,
     scaffold,
@@ -56,6 +57,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="modscan",
         description="Scan a codebase and generate plugin/mod documentation "
         "(Markdown + extension-points.json).",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"modscan {__version__}"
     )
     parser.add_argument("root", help="path to the source-available codebase to scan")
     parser.add_argument(

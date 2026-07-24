@@ -24,6 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from modscan.cli import build_parser, main, run  # noqa: E402
 from modscan.providers import FakeProvider  # noqa: E402
+from modscan.security.cli import main as audit_main  # noqa: E402
 
 API_SRC = (
     "from abc import ABC, abstractmethod\n"
@@ -340,6 +341,35 @@ def test_detect_separates_and_dedups_registration_points() -> None:
             _cleanup(pkg)
 
 
+def test_version_flag_prints_and_exits_zero() -> None:
+    """`--version` reports the installed version and exits 0.
+
+    argparse's version action raises SystemExit, so it is caught rather than
+    letting it end the run. The version comes from package metadata, never a
+    hardcoded literal, so it cannot drift from pyproject.
+    """
+    import contextlib
+    import io
+
+    from modscan import __version__
+
+    for entry, prog in ((main, "modscan"), (audit_main, "modscan-audit")):
+        buf = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buf):
+                entry(["--version"])
+        except SystemExit as exit_code:
+            assert exit_code.code == 0, (prog, exit_code.code)
+        else:
+            raise AssertionError(f"{prog} --version should exit")
+        out = buf.getvalue().strip()
+        assert out == f"{prog} {__version__}", out
+
+    # metadata-derived, not hardcoded: it is either a real version or the
+    # explicit source-checkout marker
+    assert __version__ == "0.0.0+unknown" or __version__[0].isdigit()
+
+
 if __name__ == "__main__":
     test_parser_defaults()
     test_run_with_fake_provider()
@@ -354,4 +384,5 @@ if __name__ == "__main__":
     test_is_inside_detects_output_in_scan_tree()
     test_consecutive_runs_are_independent()
     test_no_validate_examples_skips_preflight()
+    test_version_flag_prints_and_exits_zero()
     print("OK: cli self-check passed")

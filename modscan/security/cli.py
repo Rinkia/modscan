@@ -31,6 +31,7 @@ import json
 import os
 import sys
 
+from modscan import __version__
 from modscan.security.detect import find_risk_sinks
 from modscan.security.report import render_json, render_markdown
 from modscan.security.surface_diff import (
@@ -46,6 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="modscan-audit",
         description="Map a Python codebase's attack surface — where untrusted code "
         "or data can enter and execute. Enumeration only: no taint, CVEs, or secrets.",
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"modscan-audit {__version__}"
     )
     parser.add_argument(
         "root", nargs="?", help="path to the source tree to scan"

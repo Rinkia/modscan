@@ -15,6 +15,13 @@
 """MODScan — scan a codebase, generate plugin/mod documentation."""
 
 import logging as _logging
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _metadata_version
+
+try:
+    __version__ = _metadata_version("modscan")
+except _PackageNotFoundError:  # running from a source checkout, not installed
+    __version__ = "0.0.0+unknown"
 
 # Library convention: attach a NullHandler so importing modscan never configures
 # logging or prints to stderr on its own. Applications (and the CLI) opt in by

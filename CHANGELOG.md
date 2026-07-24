@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--version` on both CLIs** — `modscan --version` and `modscan-audit --version`
+  print the installed version and exit 0. Read from package metadata
+  (`modscan.__version__`), never hardcoded, so it cannot drift from
+  `pyproject.toml`; a source checkout that is not installed reports
+  `0.0.0+unknown` rather than lying.
+
 ## [0.1.7] - 2026-07-23
 
 A third language, a second lens over MCP, and two TypeScript front-end defects

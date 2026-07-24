@@ -179,6 +179,20 @@ Point it at an installed package to see it work immediately:
 modscan detect "$(python -c 'import os,click;print(os.path.dirname(click.__file__))')" --limit 5
 ```
 
+**Read the tie note before you read the ranking.** Equal scores are broken by
+module name, so when many candidates share a score the order among them is
+alphabetical rather than evidence-based. `detect` says so when the list you asked
+for cuts through such a band:
+
+> **18 candidates score exactly 1.00, and this list shows 12 of them.** The 6
+> left out are not ranked lower — ties are broken by module name, so the cut
+> through this band is alphabetical, not evidence-based.
+
+`--json` carries the same fact as `tied_with` on each point. This is a real
+property of the ranking, not a disclaimer: see
+[`benchmarks/README.md`](benchmarks/README.md) for how much of the benchmark's
+own headline the alphabet turned out to own.
+
 ### Security lens (`modscan-audit`)
 
 The same seams a plugin system exposes are also where untrusted code can enter. A

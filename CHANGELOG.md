@@ -15,6 +15,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pyproject.toml`; a source checkout that is not installed reports
   `0.0.0+unknown` rather than lying.
 
+- **`modscan detect` says when the ranking is a tie.** The detector breaks equal
+  scores on module name, so a band of equally-scored candidates is ordered
+  alphabetically — and a reader taking the top ten off a band of eighteen was
+  reading the alphabet without being told. `detect` now prints how many
+  candidates share the score at the cutoff and how many of them are shown, and
+  `--json` carries `tied_with` per point for consumers that cannot read the
+  prose. Nothing about the ranking changed; it just stopped presenting a tie as
+  an ordering. The same disclosure was added to the benchmark's own numbers.
+
 ### Fixed
 
 - **`@overload` stubs no longer report a symbol several times.** `typing.overload`

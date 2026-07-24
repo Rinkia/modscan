@@ -456,6 +456,35 @@ version lives in the unpacked directory name (`junit-jupiter-api-5.11.3/`), so a
 mismatch is caught structurally and skipped with a notice — the same discipline
 the pip and npm targets follow. Unpacked sources are gitignored.
 
+## What this benchmark currently cannot measure
+
+Every one of the labels here is a **class**. There are no function labels.
+
+That is a real blind spot, not a detail. Any signal that only affects
+`_score_function` — the function-name hook patterns (`_HOOK_NAME_PARTS`), the
+registration-decorator patterns, `_W_NAME_HOOK` — **cannot improve this
+benchmark**, because no labelled point can move. The measurement can only ever
+detect the collateral damage such a change causes, never its benefit.
+
+It duly does. Sweeping the fourteen hook-name fragments proposed in
+[#15](https://github.com/Rinkia/modscan/issues/15):
+
+| | aggregate | click |
+|---|---|---|
+| baseline | 15/29 | 4/4 |
+| each fragment **alone** | 15/29 | 4/4 |
+| **all fourteen together** | **14/29** | **3/4** |
+
+Individually neutral, collectively harmful — enough non-seam functions get
+promoted to push a real click label out of the top ten. Note that this only
+became visible because the candidates were measured *together* as well as
+separately.
+
+**Before changing a signal, ask which labels it could possibly move.** If the
+answer is none, the prerequisite is new labels of that shape — a labels-only pull
+request, justified from the targets' documentation like every other label — not a
+cleverer heuristic.
+
 ## Adding a target
 
 1. Pick a package with real documentation — the rule depends on it.

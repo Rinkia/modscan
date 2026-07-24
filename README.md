@@ -14,11 +14,15 @@ analysis. It doesn't just describe the code (Doxygen already does that); it maps
 the **seams** a modder actually hooks into, then writes a "how to build a plugin"
 guide and a **working example plugin that it validates by loading it for real**.
 
-> Status: **v0.1.0 (pre-release).** The full pipeline works end to end for
-> Python, with experimental TypeScript/JavaScript support. The extension-point
-> *ranking* is the rough edge — on large codebases it surfaces plausible but
-> low-value seams. See the [open issues](https://github.com/Rinkia/modscan/issues)
-> if you want to help sharpen it.
+> Status: **v0.1.7 (pre-release).** The full pipeline works end to end for
+> Python; TypeScript/JavaScript and Java parse into the same model and feed the
+> detector, docs and the security lens. The extension-point *ranking* is still
+> the rough edge — on large codebases it surfaces plausible but low-value seams,
+> and on some targets many candidates tie at the same score, so their order is
+> decided by traversal rather than evidence. That is measured, not guessed:
+> `benchmarks/README.md` records the baseline per target and every hypothesis
+> already tried and rejected. See the
+> [open issues](https://github.com/Rinkia/modscan/issues) if you want to help.
 
 ---
 
@@ -93,11 +97,19 @@ entirely (and, with it, the pre-flight probe).
 
 ## Languages
 
-Python is the primary, fully-integrated target. **TypeScript/JavaScript parsing
-is experimental** (via tree-sitter): it feeds the graph and detector, so
-extension points and docs work, but example *execution*-validation is Python-only
-for now. Install with `pip install modscan[typescript]`; the front-end registers
-under `typescript` and `javascript`.
+Python is the primary, fully-integrated target. **TypeScript/JavaScript and Java
+parsing are via tree-sitter**: they feed the graph and detector, so extension
+points, docs and the security lens work, but example *execution*-validation is
+Python-only — the other front-ends never run the code they read.
+
+| Language | Extra | Registers as |
+|---|---|---|
+| Python | built in | `python` |
+| TypeScript / JavaScript | `pip install modscan[typescript]` | `typescript`, `javascript` |
+| Java | `pip install modscan[java]` | `java` |
+
+How well the ranking works differs by language, and the benchmark says so rather
+than the README — see `benchmarks/README.md` for the measured baseline of each.
 
 ## LLM providers
 
@@ -135,10 +147,13 @@ ones that can't be validated are clearly marked `unverified`.
 7. ✅ TypeScript/JavaScript front-end (experimental), breaking-change diffs,
    sandboxed validation, spend controls
 8. ✅ `modscan detect` (offline ranking), GitHub Action, and MCP server
+9. ✅ Security lens — `modscan-audit` attack-surface map, snapshot diff, and a CI
+   gate that fails a PR introducing new execution sinks
+10. ✅ Java front-end; benchmark targets in Python, JavaScript and Java
 
 See **[ROADMAP.md](ROADMAP.md)** for what's next, an honest account of where the
-ranking works and where it doesn't (measured across six real packages), and how
-to contribute.
+ranking works and where it doesn't (measured across seven real packages in three
+languages), and how to contribute.
 
 ## Try it in 30 seconds (no API key)
 
@@ -150,7 +165,8 @@ finds before committing to a full documentation run. *(Requires modscan ≥ 0.1.
 pip install modscan
 modscan detect ./path/to/project            # ranked Markdown table
 modscan detect ./path/to/project --json     # machine-readable, for tooling/CI
-modscan detect ./path/to/project --limit 10 # just the top 10
+modscan detect ./path/to/project --limit 10 # just the top 10 (a cap, not the total)
+modscan --version                           # also: modscan-audit --version
 
 # Other languages (optional extras)
 modscan detect ./src --language typescript  # pip install modscan[typescript]

@@ -506,9 +506,10 @@ broke in the ranking's favour, and if every tie broke against it.
 | junit-jupiter-api 5.11.3 | 4/7 | **0..7** | 18 tied at 1.00, 10 slots |
 | marshmallow 4.3.0 | 4/6 | 4..5 | 4 tied at 0.7, 1 slot |
 | pluggy 1.6.0 | 3/3 | **0..3** | 13 tied at 0.8, 10 slots |
+| flask 3.1.2 | 3/6 | **3..3** | 1 at the cutoff — no ambiguity |
 | pygments 2.20.0 | 0/5 | 0..0 | — |
 | sqlalchemy 2.0.51 | 1/7 | 0..2 | 50 tied at 1.00, 10 slots |
-| **Aggregate** | **18/34** | **6..23** | 17 of 34 labels are tie-decided |
+| **Aggregate** | **21/40** | **9..26** | 17 of 40 labels are tie-decided |
 
 Three consequences, none of them comfortable:
 
@@ -517,7 +518,9 @@ Three consequences, none of them comfortable:
    **lower bound**.
 2. **The regression canaries were never canaries.** click's perfect 4/4 has a
    lower bound of 2/4 and pluggy's 3/3 a lower bound of **0/3** — no tie order is
-   guaranteed by the ranking. Neither can falsify a change on its own.
+   guaranteed by the ranking. Neither can falsify a change on its own. Flask was
+   added for exactly this reason; see "Flask: the first target that can falsify
+   a change" below.
 3. **JUnit and SQLAlchemy are *not* the same problem**, despite looking alike.
 
 ### JUnit's band is not noise — the metric is wrong, not the ranking
@@ -548,6 +551,64 @@ role-named *and* re-exported. More evidence is not better evidence — the
 alphabet, chosen arbitrarily, beats both.
 
 Recorded so nobody re-derives it. The clamp is not hiding a usable signal.
+
+## Flask: the first target that can falsify a change
+
+Measuring ties exposed a problem the aggregate had been hiding: **every target
+here scores its labels inside a tied band**, so no single target could refute a
+heuristic on its own. click's perfect 4/4 has a lower bound of 2/4; pluggy's 3/3
+has a lower bound of 0/3. A benchmark of eight targets had, in effect, no
+regression guard.
+
+Flask 3.1.2 was added to fix that, and it was chosen **by measurement, not by
+taste**. Its score distribution is graded rather than flat:
+
+| Score | 1.00 | 0.90 | 0.85 | 0.80 | 0.60 | … |
+|---|---|---|---|---|---|---|
+| Candidates | 3 | 6 | **1** | 23 | 1 | |
+
+Exactly one candidate holds the score at the rank-10 cutoff, so **flask's
+recall@10 has no tie bounds at all** — worst case equals best case. It is the
+only target of the eight whose number is pure evidence.
+
+| Target | Candidates | Labels | Rank of each label | recall@10 | Median |
+|---|---|---|---|---|---|
+| flask 3.1.2 | 98 | 6 | 2, 3, 10, 38, 39, 98 | **3/6** | 24 |
+
+Aggregate moves to **21/40, bounds 9..26** — the tie-decided share drops from
+17/34 to 17/40 because all six new labels are tie-free.
+
+### What it already says about the ranking
+
+- **`MethodView` ranks 98 of 98 — dead last.** It is arguably Flask's most-used
+  class-based extension point, and it scores the bare public baseline: it is not
+  an ABC, its name ends in no role suffix the catalog knows, its base
+  (`View`) likewise, and it is not re-exported under a name the root `__init__`
+  advertises as a seam. Every existing signal is blind to it.
+- **The implementation outranks the base it implements.**
+  `DefaultJSONProvider` is 1st, `JSONProvider` — the class the docstring
+  explicitly tells you to subclass — is 10th. The role-suffix and base-role
+  signals both reward the concrete subclass more than the contract.
+- **Dynamic imports occupy ranks 4–9**, pushing `Flask` and `Blueprint` below
+  them. This is the pygments failure again, on a package where the loader sites
+  are ordinary `import_string` helpers rather than a plugin registry.
+
+### What it deliberately cannot say
+
+Flask's *largest* extension surface is the decorator methods on the app and
+blueprint objects — `before_request`, `errorhandler`, `template_filter`,
+`context_processor`. None of them can be labelled, because the parser only takes
+**top-level defs** as seams and these are methods. That blind spot is a reason to
+add this target, not a reason to avoid it: it is now visible in the labels file
+instead of being an unwritten limitation.
+
+Two exclusions, both by the labelling rule:
+
+- **`Flask` itself.** Its shipped docstring describes what the object does and
+  never invites subclassing. The web guide is more encouraging, but labels come
+  from the docs shipped *at the pinned version*.
+- **`Blueprint`.** You construct one and register the instance, which the rule
+  counts as calling an API rather than implementing one.
 
 ## What this benchmark still cannot measure well
 
@@ -659,7 +720,8 @@ If resolution ever genuinely binds, add **targets** — never labels.
 ## Running it
 
 ```bash
-pip install pluggy==1.6.0 click==8.4.2 sqlalchemy==2.0.51
+pip install pluggy==1.6.0 click==8.4.2 sqlalchemy==2.0.51 \
+            pygments==2.20.0 marshmallow==4.3.0 flask==3.1.2
 python benchmarks/score.py            # all targets
 python benchmarks/score.py --target pluggy
 ```

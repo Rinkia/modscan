@@ -88,6 +88,10 @@ Honest reading, not cherry-picked:
 - The **Plugin registration points** section shows how markdown discovers plugins
   (`entry_points`, plus `import_module`/`find_spec` loader sites), reported apart
   from the implement-this ranking rather than flooding it.
+- The note under the header is the honest part: **eighteen candidates tie at
+  1.00 and the run shows twelve**, so the six left out were cut by module name,
+  not by evidence. Without that line the twelve rows read as a ranking. They are
+  a band with an alphabetical cut through it.
 
 Reproduce it (free):
 

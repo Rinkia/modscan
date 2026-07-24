@@ -233,6 +233,49 @@ def _split_detect_points(points: list) -> tuple[list, list]:
     return implement, registration
 
 
+def _tied_counts(points: list) -> list[int]:
+    """How many *other* points share each point's score, positionally.
+
+    The detector breaks score ties on (module, lineno) — alphabetically. So a
+    point's printed position inside a tied band reflects its name, not the
+    evidence for it, and a reader taking "the top ten" off a band of eighteen is
+    reading the alphabet. Counting the band is what lets the output say so.
+    """
+    per_score: dict[float, int] = {}
+    for point in points:
+        per_score[point.score] = per_score.get(point.score, 0) + 1
+    return [per_score[p.score] - 1 for p in points]
+
+
+def _tie_note(points: list, shown: int) -> str | None:
+    """One line telling the reader which part of this ranking is the alphabet.
+
+    ``points`` is the full ranked list, ``shown`` how many of it are displayed —
+    the band has to be measured before ``--limit`` cuts it, or the note would
+    describe the truncated list rather than the ranking.
+    """
+    if not points or shown <= 0:
+        return None
+    cutoff = points[min(shown, len(points)) - 1].score
+    band = sum(1 for p in points if p.score == cutoff)
+    if band < 2:
+        return None
+    above = sum(1 for p in points if p.score > cutoff)
+    in_view = min(shown, len(points)) - above
+    if band > in_view:
+        return (
+            f"**{band} candidates score exactly {cutoff:.2f}, and this list shows "
+            f"{in_view} of them.** The {band - in_view} left out are not ranked lower — "
+            "ties are broken by module name, so the cut through this band is "
+            "alphabetical, not evidence-based. Widen `--limit` to see the whole band."
+        )
+    return (
+        f"**The last {band} entries score exactly {cutoff:.2f}.** Ties are broken by "
+        "module name, so their order among themselves is alphabetical, not "
+        "evidence-based."
+    )
+
+
 def _point_module(seam, root: str, label: str | None) -> str:
     """Module qualname for output, or a clean fallback for a root-package symbol
     (empty qualname): the label if set, else the scan root's basename — never the
@@ -240,8 +283,24 @@ def _point_module(seam, root: str, label: str | None) -> str:
     return seam.module or label or os.path.basename(os.path.normpath(root))
 
 
+def _detect_json_entry(point, tied_with: int, root: str, label: str | None) -> dict:
+    return {
+        "id": f"{_point_module(point.seam, root, label)}:{point.seam.name}",
+        "module": point.seam.module or None,
+        "category": point.category,
+        "score": round(point.score, 4),
+        "tied_with": tied_with,
+        "kind": point.seam.kind,
+        "signals": list(point.signals),
+    }
+
+
 def _render_detect_markdown(
-    implement: list, registration: list, root: str, label: str | None = None
+    implement: list,
+    registration: list,
+    root: str,
+    label: str | None = None,
+    tie_note: str | None = None,
 ) -> str:
     # Root-package symbols have an empty qualname; _point_module keeps their ids
     # clean (label, else the root basename) instead of leaking the scan path.
@@ -252,6 +311,10 @@ def _render_detect_markdown(
         f"{len(implement)} candidate(s), ranked by moddability. No LLM was used — "
         "this is the static ranking only.",
         "",
+    ]
+    if tie_note:
+        lines += [tie_note, ""]
+    lines += [
         "| # | Extension point | Category | Score | Why |",
         "|---|---|---|---|---|",
     ]
@@ -321,10 +384,17 @@ def _main_detect(argv: list[str]) -> int:
     codebase = get_language_parser(args.language).parse_codebase(args.root)
     points = detect_extension_points(build_graph(codebase), min_score=args.min_score)
     implement, registration = _split_detect_points(points)
+    # Ties are measured on the FULL ranked list: --limit is exactly the cut that
+    # can fall inside a band, so a note computed after truncation would describe
+    # the wrong thing.
+    tied = _tied_counts(implement)
+    shown = len(implement) if args.limit is None else min(args.limit, len(implement))
+    tie_note = _tie_note(implement, shown)
     # --limit caps the ranked implement-this list; registration points are a
     # small deduplicated set, always shown in full.
     if args.limit is not None:
         implement = implement[: args.limit]
+        tied = tied[: args.limit]
 
     # Signal strings contain an em-dash; a Windows cp1252 console would raise
     # UnicodeEncodeError printing them. Emit UTF-8 regardless of console locale.
@@ -332,20 +402,21 @@ def _main_detect(argv: list[str]) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
 
     if args.json:
+        # tied_with is the prose note's machine-readable twin: a consumer that
+        # ranks or truncates this payload needs to know a score is shared, and
+        # cannot read the Markdown warning. Registration points are a
+        # deduplicated set rather than a ranking, so they carry 0.
         payload = [
-            {
-                "id": f"{_point_module(p.seam, args.root, args.label)}:{p.seam.name}",
-                "module": p.seam.module or None,
-                "category": p.category,
-                "score": round(p.score, 4),
-                "kind": p.seam.kind,
-                "signals": list(p.signals),
-            }
-            for p in implement + registration
+            _detect_json_entry(p, n, args.root, args.label)
+            for p, n in list(zip(implement, tied)) + [(r, 0) for r in registration]
         ]
         print(json.dumps(payload, indent=2))
     else:
-        print(_render_detect_markdown(implement, registration, args.root, args.label))
+        print(
+            _render_detect_markdown(
+                implement, registration, args.root, args.label, tie_note
+            )
+        )
     return 0
 
 

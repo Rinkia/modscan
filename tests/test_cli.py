@@ -341,6 +341,85 @@ def test_detect_separates_and_dedups_registration_points() -> None:
             _cleanup(pkg)
 
 
+class _FakePoint:
+    """Only the attributes the tie helpers read."""
+
+    def __init__(self, score: float) -> None:
+        self.score = score
+
+
+def test_tied_counts_report_the_band_not_the_position() -> None:
+    from modscan.cli import _tied_counts
+
+    points = [_FakePoint(s) for s in (1.0, 1.0, 1.0, 0.8, 0.1)]
+    assert _tied_counts(points) == [2, 2, 2, 0, 0]
+
+
+def test_tie_note_warns_when_the_limit_cuts_through_a_band() -> None:
+    """JUnit's shape: 18 tied at 1.00, a reader takes the top 10 and sees 4 of 7."""
+    from modscan.cli import _tie_note
+
+    points = [_FakePoint(1.0) for _ in range(18)] + [_FakePoint(0.7) for _ in range(5)]
+    note = _tie_note(points, shown=10)
+    assert note is not None
+    assert "18 candidates score exactly 1.00" in note
+    assert "shows 10 of them" in note
+    assert "alphabetical" in note, "the reader must be told what decided the cut"
+
+
+def test_tie_note_reports_a_fully_shown_band_without_crying_truncation() -> None:
+    from modscan.cli import _tie_note
+
+    points = [_FakePoint(1.0) for _ in range(3)]
+    note = _tie_note(points, shown=3)
+    assert note is not None
+    assert "last 3 entries" in note
+    assert "left out" not in note, "nothing was cut — do not claim it was"
+
+
+def test_tie_note_is_silent_when_the_cutoff_is_unambiguous() -> None:
+    """No note is better than a note nobody needs — this one must not become noise."""
+    from modscan.cli import _tie_note
+
+    points = [_FakePoint(s) for s in (1.0, 0.9, 0.8)]
+    assert _tie_note(points, shown=2) is None
+    assert _tie_note([], shown=10) is None
+    assert _tie_note(points, shown=0) is None
+
+
+def test_detect_json_carries_tied_with() -> None:
+    """The prose note's machine-readable twin: a JSON consumer cannot read Markdown."""
+    import io
+    import json as _json
+    from contextlib import redirect_stdout
+
+    pkg = "clities"
+    with tempfile.TemporaryDirectory() as root:
+        d = os.path.join(root, pkg)
+        os.makedirs(d)
+        open(os.path.join(d, "__init__.py"), "w").close()
+        # two classes that score identically, and one that does not
+        with open(os.path.join(d, "api.py"), "w", encoding="utf-8") as fh:
+            fh.write(
+                "class AlphaHandler:\n    pass\n"
+                "class BetaHandler:\n    pass\n"
+                "class Plain:\n    pass\n"
+            )
+        try:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                assert main(["detect", root, "--json"]) == 0
+            payload = _json.loads(buf.getvalue())
+            by_name = {e["id"].rsplit(":", 1)[-1]: e for e in payload}
+
+            assert by_name["AlphaHandler"]["score"] == by_name["BetaHandler"]["score"]
+            assert by_name["AlphaHandler"]["tied_with"] == 1
+            assert by_name["BetaHandler"]["tied_with"] == 1
+            assert by_name["Plain"]["tied_with"] == 0, "a unique score is tied with nothing"
+        finally:
+            _cleanup(pkg)
+
+
 def test_version_flag_prints_and_exits_zero() -> None:
     """`--version` reports the installed version and exits 0.
 
@@ -385,4 +464,9 @@ if __name__ == "__main__":
     test_consecutive_runs_are_independent()
     test_no_validate_examples_skips_preflight()
     test_version_flag_prints_and_exits_zero()
+    test_tied_counts_report_the_band_not_the_position()
+    test_tie_note_warns_when_the_limit_cuts_through_a_band()
+    test_tie_note_reports_a_fully_shown_band_without_crying_truncation()
+    test_tie_note_is_silent_when_the_cutoff_is_unambiguous()
+    test_detect_json_carries_tied_with()
     print("OK: cli self-check passed")

@@ -93,16 +93,21 @@ def find_risk_sinks(
     could not parse), then re-parses each to walk for sinks.
 
     ``language`` selects the front-end; "typescript"/"javascript" share the
-    tree-sitter detector. Python is the default, so the released call signature
-    is unchanged.
+    tree-sitter detector and "java" has its own. Python is the default, so the
+    released call signature is unchanged.
     """
     if language in ("typescript", "javascript"):
         from modscan.security.detect_ts import find_ts_risk_sinks
 
         return find_ts_risk_sinks(root, exclude=exclude)
+    if language == "java":
+        from modscan.security.detect_java import find_java_risk_sinks
+
+        return find_java_risk_sinks(root, exclude=exclude)
     if language != "python":
         raise ValueError(
-            f"unknown language {language!r}; expected 'python', 'typescript' or 'javascript'"
+            f"unknown language {language!r}; expected 'python', 'typescript', "
+            "'javascript' or 'java'"
         )
 
     codebase = parse_codebase(root, exclude=exclude)

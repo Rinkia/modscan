@@ -82,10 +82,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--language",
-        choices=("python", "typescript", "javascript"),
+        choices=("python", "typescript", "javascript", "java"),
         default="python",
         help="source language of the tree to scan (default: python). "
-        "typescript/javascript need the tree-sitter extra: pip install modscan[typescript]",
+        "typescript/javascript need pip install modscan[typescript]; "
+        "java needs pip install modscan[java]",
     )
     parser.add_argument(
         "--exclude",

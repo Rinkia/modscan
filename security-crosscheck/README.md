@@ -6,6 +6,31 @@ Two checks live here, one per language:
 |---|---|---|---|
 | Python | [Bandit](https://github.com/PyCQA/bandit) | `crosscheck.py` | 27/27 in-scope |
 | TypeScript / JavaScript | [eslint-plugin-security](https://github.com/eslint-community/eslint-plugin-security) | `crosscheck_ts.py` | 10/10 in-scope |
+| **Java** | — | — | **not validated yet** |
+
+## Java is the gap, and it is a structural one
+
+The Java sink catalog (`modscan/security/sinks_java.py`) ships without a
+cross-check, which makes it the least proven of the three. This is not an
+oversight to be fixed by writing another script like the two above.
+
+The obvious authority is **find-sec-bugs**, the SpotBugs plugin the catalog is
+modelled on — its detector names are cited per catalog entry. But SpotBugs
+analyses **bytecode**, and MODScan reads source. Every Java target here is a
+Maven `-sources.jar`. Comparing the two therefore needs either:
+
+- a **compile step** in the harness (a JDK, a resolved classpath per target, and
+  a build that succeeds for a sources jar with no build file — the classpath is
+  the hard part, not the compiler), or
+- a **source-level authority** instead. Semgrep has Java rules and works on
+  source, which would sidestep the whole problem, at the cost of a less
+  authoritative comparison than the tool the catalog was actually modelled on.
+
+Until one of those exists, the Java catalog rests on its self-check and a smoke
+run over real sources (snakeyaml, xstream, spring-expression, commons-lang3),
+which is weaker evidence than the other two languages have. `README.md` says so
+where users will see it, rather than letting Java ride on the Python and
+TypeScript numbers.
 
 ## TypeScript / JavaScript
 

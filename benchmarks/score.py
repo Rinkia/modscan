@@ -26,6 +26,12 @@ precision@10 and the median rank. The headline is aggregate recall@10 across all
 targets; see benchmarks/README.md for why it is aggregate and why median rank is
 reported alongside.
 
+recall@10 is also reported with **tie bounds**. The detector breaks score ties
+alphabetically, so when a band of equally-scored candidates straddles rank 10,
+the alphabet — not the ranking — decides which labels land inside. The bounds say
+what the score would be if every tie broke in the ranking's favour and if every
+tie broke against it. A change is only real if it moves the lower bound.
+
 A target that is not installed, or installed at a version other than the one its
 labels were derived from, is SKIPPED with a notice. A score against a different
 version would be misleading, and a misleading number is worse than no number.
@@ -80,6 +86,31 @@ def precision_at_k(ranks: dict[str, int], k: int = K) -> tuple[int, int]:
     1 no matter how good the ranking is. See benchmarks/README.md.
     """
     return sum(1 for r in ranks.values() if r <= k), k
+
+
+def tie_bounds(scores: list[float], position: int) -> tuple[int, int]:
+    """Best and worst rank the point at 1-based ``position`` could hold.
+
+    The detector breaks score ties by module name, i.e. alphabetically, so a
+    point's printed rank inside a tied band is an artefact of its name. These are
+    the bounds of that band: the rank it would have if the tie broke entirely in
+    its favour, and if it broke entirely against.
+    """
+    score = scores[position - 1]
+    higher = sum(1 for s in scores if s > score)
+    same = sum(1 for s in scores if s == score)
+    return higher + 1, higher + same
+
+
+def recall_bounds(bounds: dict[str, tuple[int, int]], k: int = K) -> tuple[int, int]:
+    """Labelled points reaching the top k under the best and worst tie order.
+
+    When these two disagree, the tie order — not the ranking — is deciding the
+    score, and ``recall_at_k`` should be read as one sample from that interval.
+    """
+    best = sum(1 for lo, _ in bounds.values() if lo <= k)
+    worst = sum(1 for _, hi in bounds.values() if hi <= k)
+    return worst, best
 
 
 def median_rank(ranks: dict[str, int]) -> float:
@@ -177,8 +208,9 @@ def rank_labels(
     labels: set[str],
     language: str = "python",
     pinned: str = "",
-) -> tuple[dict[str, int], int]:
-    """Rank of every labelled point in the detector's output, plus the candidate count.
+) -> tuple[dict[str, int], dict[str, tuple[int, int]], int]:
+    """Rank of every labelled point in the detector's output, plus tie bounds and
+    the candidate count.
 
     A label the detector never surfaces is recorded at ``candidates + 1`` rather
     than dropped. Dropping it would let a change that loses a seam entirely make
@@ -203,7 +235,9 @@ def rank_labels(
         codebase = get_language_parser(language).parse_codebase(root)
     points = detect_extension_points(build_graph(codebase))
 
+    scores = [p.score for p in points]
     ranks: dict[str, int] = {}
+    bounds: dict[str, tuple[int, int]] = {}
     for position, point in enumerate(points, start=1):
         pid = (
             normalise_id(target, point.seam.module, point.seam.name)
@@ -212,11 +246,13 @@ def rank_labels(
         )
         if pid in labels and pid not in ranks:
             ranks[pid] = position
+            bounds[pid] = tie_bounds(scores, position)
 
     for missing in labels - set(ranks):
         ranks[missing] = len(points) + 1
+        bounds[missing] = (len(points) + 1, len(points) + 1)
 
-    return ranks, len(points)
+    return ranks, bounds, len(points)
 
 
 def main() -> int:
@@ -237,6 +273,7 @@ def main() -> int:
     rows: list[str] = []
     absent: list[str] = []
     scored_hits = scored_total = 0
+    scored_worst = scored_best = 0
 
     for name, target in sorted(targets.items()):
         pinned = target["version"]
@@ -247,24 +284,33 @@ def main() -> int:
             continue
 
         labels = {p["id"] for p in target["extension_points"]}
-        ranks, candidates = rank_labels(name, labels, language, pinned)
+        ranks, bounds, candidates = rank_labels(name, labels, language, pinned)
 
         hits, total = recall_at_k(ranks)
+        worst, best = recall_bounds(bounds)
         scored_hits += hits
         scored_total += total
+        scored_worst += worst
+        scored_best += best
 
         absent += [pid for pid, r in ranks.items() if r > candidates]
         ordered = ", ".join(str(r) for r in sorted(ranks.values()))
+        # ASCII only: this line is printed, and Windows' cp1252 stdout mangles
+        # an en-dash into a question mark.
+        span = f"{hits}/{total}" if worst == best else f"{hits}/{total} ({worst}..{best})"
         rows.append(
             f"| {name} {pinned} | {candidates} | {total} | {ordered} | "
-            f"{hits}/{total} | {median_rank(ranks):g} |"
+            f"{span} | {median_rank(ranks):g} |"
         )
 
     if not rows:
         print("\nNothing scored — install the pinned targets and re-run.")
         return 1
 
-    print(f"\n| Target | Candidates | Labels | Rank of each label | recall@{K} | Median rank |")
+    print(
+        f"\n| Target | Candidates | Labels | Rank of each label | "
+        f"recall@{K} (tie bounds) | Median rank |"
+    )
     print("|---|---|---|---|---|---|")
     print("\n".join(rows))
 
@@ -272,6 +318,13 @@ def main() -> int:
         print(f"\nNOT DETECTED: {pid} — counted at candidates+1.")
 
     print(f"\nAggregate recall@{K}: {scored_hits}/{scored_total}")
+    if scored_worst != scored_best:
+        print(
+            f"Tie-aware bounds: {scored_worst}/{scored_total} to {scored_best}/{scored_total}. "
+            f"{scored_best - scored_worst} of {scored_total} labels sit in a band that straddles "
+            f"rank {K}, so their hit or miss is decided by the alphabetical tiebreak, not by the "
+            f"ranking. Judge a change on the LOWER bound."
+        )
     if len(rows) < len(truth["targets"]):
         print("Partial run — the aggregate is not comparable to the published baseline.")
     return 0

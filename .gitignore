@@ -35,3 +35,7 @@ node_modules/
 
 # Java benchmark sources unpacked from Maven Central (benchmarks/java/fetch.py)
 benchmarks/java/*-*/
+
+# Downstream plugin packages for the usage cross-check. Pinned in
+# usage-crosscheck/downstream.json, installed with --target, never committed.
+usage-crosscheck/downstream/

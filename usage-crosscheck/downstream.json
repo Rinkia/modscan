@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0",
+  "note": "Pinned downstream packages per host, the lockfile of this cross-check. Chosen by download rank on PyPI, not by whether they flatter the result: the point is a sample nobody in this project curated toward an answer. Only the sources are parsed - nothing here is imported or executed.",
+  "hosts": {
+    "marshmallow": {
+      "version": "4.3.0",
+      "why": "Subclassing IS its documented extension mechanism, so the signal should be present if it exists anywhere.",
+      "downstream": {
+        "marshmallow-sqlalchemy": "1.4.2",
+        "marshmallow-dataclass": "8.7.1",
+        "webargs": "8.7.0",
+        "marshmallow-oneofschema": "3.2.0",
+        "apispec": "6.8.2",
+        "environs": "14.5.0",
+        "marshmallow-jsonapi": "0.24.0",
+        "marshmallow-polyfield": "5.11",
+        "marshmallow-union": "0.1.15.post1",
+        "flask-marshmallow": "1.3.0"
+      }
+    },
+    "click": {
+      "version": "8.4.2",
+      "why": "A second subclass-style host, to check the marshmallow result is not one package's habit.",
+      "downstream": {
+        "click-plugins": "1.1.1.2",
+        "click-repl": "0.3.0",
+        "click-default-group": "1.2.4",
+        "click-option-group": "0.5.7",
+        "click-help-colors": "0.9.4",
+        "click-didyoumean": "0.3.1",
+        "typer": "0.20.0",
+        "click-completion": "0.5.2",
+        "click-log": "0.4.0",
+        "rich-click": "1.9.4"
+      }
+    },
+    "flask": {
+      "version": "3.1.2",
+      "why": "The control. Flask is extended by REGISTERING against the app object, not by subclassing, so a method that only counts subclasses should find almost nothing here. It does not, and that negative is the useful part.",
+      "downstream": {
+        "flask-sqlalchemy": "3.1.1",
+        "flask-login": "0.6.3",
+        "flask-wtf": "1.2.2",
+        "flask-cors": "6.0.1",
+        "flask-caching": "2.3.1",
+        "flask-restful": "0.3.10",
+        "flask-admin": "1.6.1",
+        "flask-migrate": "4.1.0",
+        "flask-smorest": "0.46.1",
+        "flask-jwt-extended": "4.7.1",
+        "flask-session": "0.8.0",
+        "flask-marshmallow": "1.3.0"
+      }
+    }
+  }
+}

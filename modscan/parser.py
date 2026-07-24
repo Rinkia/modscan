@@ -142,6 +142,41 @@ def _parse_class(node: ast.ClassDef) -> ClassInfo:
     )
 
 
+def _is_overload_stub(func: FunctionInfo) -> bool:
+    """True for a `@overload`-decorated def — a type-checker signature, not code.
+
+    Matched on the trailing segment so `overload`, `typing.overload` and any
+    aliased import (`t.overload`) all count, the same way base classes are
+    matched against ABC.
+    """
+    return any(d.split(".")[-1] == "overload" for d in func.decorators)
+
+
+def _drop_overload_stubs(functions: list[FunctionInfo]) -> list[FunctionInfo]:
+    """Collapse a `@overload` family down to the single def that implements it.
+
+    `typing.overload` declares one signature per variant and then one real
+    implementation, so a parser that takes every `def` at face value reports the
+    same public symbol several times. SQLAlchemy alone yielded 107 duplicate
+    seams that way — three `union_all`s ranked as three separate candidates,
+    inflating exactly the tied bands the ranking is judged on.
+
+    A name with no implementation (every def a stub, as in a Protocol body or a
+    re-exported signature) keeps its first stub: the symbol is still public, and
+    dropping it outright would lose a seam rather than deduplicate one.
+    """
+    implemented = {f.name for f in functions if not _is_overload_stub(f)}
+    kept: list[FunctionInfo] = []
+    stub_only_seen: set[str] = set()
+    for func in functions:
+        if not _is_overload_stub(func):
+            kept.append(func)
+        elif func.name not in implemented and func.name not in stub_only_seen:
+            stub_only_seen.add(func.name)
+            kept.append(func)
+    return kept
+
+
 class _ModuleVisitor(ast.NodeVisitor):
     """Collects top-level defs plus dynamic-import calls anywhere in the tree."""
 
@@ -161,6 +196,7 @@ class _ModuleVisitor(ast.NodeVisitor):
                 self._add_import_from(child)
             elif isinstance(child, ast.Assign):
                 self._maybe_all(child)
+        self.module.functions[:] = _drop_overload_stubs(self.module.functions)
         # Dynamic-import calls can appear at any depth: scan the whole tree.
         for sub in ast.walk(node):
             if isinstance(sub, ast.Call):

@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pyproject.toml`; a source checkout that is not installed reports
   `0.0.0+unknown` rather than lying.
 
+### Fixed
+
+- **`@overload` stubs no longer report a symbol several times.** `typing.overload`
+  declares one signature per variant and then one implementation, and the parser
+  took every `def` at face value — so a scan of SQLAlchemy listed `union_all`
+  three times, as three separate candidates, at ranks 20, 21 and 22. `detect`
+  now emits one seam per overloaded symbol, keeping the implementation and its
+  line number; a symbol that is only ever stubs (a Protocol body, a re-exported
+  signature) is deduplicated rather than dropped. SQLAlchemy loses 91 phantom
+  candidates (2092 → 2001) and click 22; the benchmark's recall is unchanged,
+  but every median improves because the duplicates were padding the ranks.
+
 ## [0.1.7] - 2026-07-23
 
 A third language, a second lens over MCP, and two TypeScript front-end defects

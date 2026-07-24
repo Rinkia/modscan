@@ -265,9 +265,54 @@ def test_parse_codebase_excludes_output_dir() -> None:
     print("OK: output-dir exclusion self-check passed")
 
 
+def test_overload_stubs_collapse_to_one_seam() -> None:
+    """A `@overload` family is one public symbol, not one per signature.
+
+    SQLAlchemy's shape: two typing-only stubs then the implementation. Taking
+    every `def` at face value made `union_all` three separate candidates ranked
+    20, 21 and 22, inflating the tied bands the ranking is judged on.
+    """
+    source = (
+        "from typing import overload\n"
+        "import typing as t\n"
+        "\n"
+        "@overload\n"
+        "def union_all(a: int) -> int: ...\n"
+        "@t.overload\n"
+        "def union_all(a: str) -> str: ...\n"
+        "def union_all(a):\n"
+        "    return a\n"
+        "\n"
+        "@overload\n"
+        "def stub_only(a: int) -> int: ...\n"
+        "@overload\n"
+        "def stub_only(a: str) -> str: ...\n"
+        "\n"
+        "def plain():\n"
+        "    return 1\n"
+    )
+    with tempfile.TemporaryDirectory() as root:
+        with open(os.path.join(root, "mod.py"), "w", encoding="utf-8") as fh:
+            fh.write(source)
+        module = parse_codebase(root).modules[0]
+
+        union = [f for f in module.functions if f.name == "union_all"]
+        assert len(union) == 1, f"one seam per overloaded symbol, got {len(union)}"
+        assert union[0].decorators == (), "the implementation is kept, not a stub"
+        assert union[0].lineno == 8, "and it keeps the implementation's line"
+
+        stub_only = [f for f in module.functions if f.name == "stub_only"]
+        assert len(stub_only) == 1, "a stub-only symbol is deduplicated, not dropped"
+
+        assert len([f for f in module.functions if f.name == "plain"]) == 1
+
+    print("OK: overload-stub collapse self-check passed")
+
+
 if __name__ == "__main__":
     test_parser_and_graph()
     test_new_dynamic_calls()
     test_import_module_still_isolated_via_parse_file()
     test_override_point_detected()
     test_parse_codebase_excludes_output_dir()
+    test_overload_stubs_collapse_to_one_seam()

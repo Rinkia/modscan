@@ -610,6 +610,63 @@ Two exclusions, both by the labelling rule:
 - **`Blueprint`.** You construct one and register the instance, which the rule
   counts as calling an API rather than implementing one.
 
+## A second authority: what real plugins actually extend
+
+Every label here rests on **one** source — the host's own documentation — while
+MODScan's ranking is the thing being judged. Neither can validate the other. The
+security lens has had an external authority since day one (Bandit,
+eslint-plugin-security); moddability had none.
+
+[`usage-crosscheck/`](../usage-crosscheck/) is that authority. It parses a pinned
+set of real downstream plugins and counts how many of them **subclass** each host
+symbol. Nobody in this project decides what a plugin author chose to subclass.
+
+| Host | Downstream | Top subclassed | Rank here | Labelled? |
+|---|---|---|---|---|
+| marshmallow 4.3.0 | 10 | `Field` — 7 of 10 plugins | **26** | yes |
+| click 8.4.2 | 11 | `Group`, `Command` — 5 each | 9, 8 | yes |
+| flask 3.1.2 | 12 | nothing above 1 | — | — |
+
+**The authority agrees with the labels and disagrees with the ranking.** On both
+subclass-style hosts the most-subclassed symbols are exactly the documented
+labels — maintainer docs and plugin-author behaviour, two independent sources,
+picking the same symbols. That is the first evidence the labelling rule captures
+something real rather than merely plausible.
+
+Then: **`Field` is the single most-subclassed symbol in the marshmallow
+ecosystem, and it ranks 26.** Its miss was already recorded; what is new is that
+it is not marginal. Seven of ten plugins subclass it.
+
+Two results that keep the method honest:
+
+- **Import count is not a substitute.** Measured alongside, and it ranks by API
+  popularity, not extensibility: marshmallow's most-imported symbol is
+  `ValidationError` (an exception you catch), click's is `echo`. Those are the
+  things you *merely call*, which the labelling rule excludes by name — so an
+  import-count authority would contradict the rule the labels rest on.
+- **Flask is the control, and it fails as predicted.** It is extended by
+  registering against the app object, not by subclassing, and the check finds
+  nothing above a single occurrence. That reproduces the blind spot recorded
+  against the flask target above, from a completely independent direction.
+
+So the authority's scope is explicit: it speaks about **class seams in
+ecosystems that extend by subclassing**. marshmallow's three function labels are
+correctly reported as never subclassed — decorators are called, not inherited.
+
+**This is not the rejected internal-subclass-count hypothesis.** That counted
+subclasses *inside the scanned package* and failed because a package's own
+machinery subclasses its own bases constantly (`Dialect` re-buried under ~500
+co-boosted classes). This counts **downstream** subclasses — which the rejection
+writeup itself named as the place the evidence lives and a single-package scan
+can never reach. It cannot become a detector weight for the same reason: the scan
+does not see downstream code. Its role is as a **judge**, not a signal — a
+ranking change can now be asked whether it moves the symbols real plugins extend.
+
+Symbols subclassed but unlabelled (marshmallow `List`, `Nested`; click `Option`,
+`CommandCollection`) are reported as candidates for a **documentation check**.
+Adding labels because usage is high would make the benchmark circular in a new
+direction; "add targets, never labels" exists for exactly this temptation.
+
 ## What this benchmark still cannot measure well
 
 Function labels now exist, but only five of thirty-four — and three of those

@@ -456,18 +456,54 @@ version lives in the unpacked directory name (`junit-jupiter-api-5.11.3/`), so a
 mismatch is caught structurally and skipped with a notice — the same discipline
 the pip and npm targets follow. Unpacked sources are gitignored.
 
-## What this benchmark currently cannot measure
+## Function labels, and why the aggregate jumped
 
-Every one of the labels here is a **class**. There are no function labels.
+Until 2026-07-23 every label here was a **class**, which left the benchmark
+unable to judge any signal that only scores functions. Five function labels were
+added to fix that — registration points a user decorates their own function with,
+each quoting the target's own docstring:
 
-That is a real blind spot, not a detail. Any signal that only affects
-`_score_function` — the function-name hook patterns (`_HOOK_NAME_PARTS`), the
-registration-decorator patterns, `_W_NAME_HOOK` — **cannot improve this
-benchmark**, because no labelled point can move. The measurement can only ever
-detect the collateral damage such a change causes, never its benefit.
+| Label | Rank | Docstring |
+|---|---|---|
+| `marshmallow.decorators:validates` | 1 | *"Register a validator method for field(s)."* |
+| `marshmallow.decorators:post_dump` | 4 | *"Register a method to invoke after serializing an object."* |
+| `marshmallow.decorators:pre_load` | 5 | *"Register a method to invoke before deserializing an object."* |
+| `sqlalchemy.event.api:listens_for` | 361 | *"Decorate a function as a listener for the given target + identifier."* |
+| `sqlalchemy.ext.compiler:compiles` | 1026 | *"Register a function as a compiler for a given ClauseElement type."* |
 
-It duly does. Sweeping the fourteen hook-name fragments proposed in
-[#15](https://github.com/Rinkia/modscan/issues/15):
+**The aggregate went 15/29 → 18/34. That is not a ranking improvement.** Three of
+the five were already in their target's top ten, so adding them raised the number
+by construction. Stating it plainly because the alternative — letting a jump like
+that read as progress — is precisely the abuse the gate on this directory exists
+to prevent.
+
+What actually changed is what the benchmark can *see*:
+
+- **A function-name signal is now measurable.** [#15](https://github.com/Rinkia/modscan/issues/15)
+  was unjudgeable before this; it now has labels it could move.
+- **Two honest hard targets appeared.** `listens_for` (361) and `compiles` (1026)
+  are both far outside the top ten. `compiles` is especially pointed: the
+  compiler-registration mechanism that the rejected whole-program-resolution work
+  kept circling is now a *labelled, measurable* miss rather than an anecdote.
+
+marshmallow moves 1/3 → 4/6, SQLAlchemy 1/5 → **1/7** — it gained two labels and
+caught neither.
+
+## What this benchmark still cannot measure well
+
+Function labels now exist, but only five of thirty-four — and three of those
+already sit near the top of their target. So a signal that scores functions
+(`_HOOK_NAME_PARTS`, the registration-decorator patterns, `_W_NAME_HOOK`) is
+*judgeable* now, where before it was not, but the evidence is thin: the two
+genuinely hard function labels are `listens_for` (361) and `compiles` (1026), and
+a signal would have to move one of those a long way to register.
+
+The sweep below was run **before** these labels existed, when the answer could
+only ever be "no change or worse". It is kept because the interaction effect it
+found is still real — and worth re-running now that there is something to gain.
+
+Sweeping the fourteen hook-name fragments proposed in
+[#15](https://github.com/Rinkia/modscan/issues/15), against the 15/29 baseline:
 
 | | aggregate | click |
 |---|---|---|

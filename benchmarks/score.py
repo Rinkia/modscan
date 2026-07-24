@@ -18,7 +18,8 @@
 Answers one question before you open a pull request: did this heuristic change
 help? Runs offline and free — no API key, no paid call, no network.
 
-    pip install pluggy==1.6.0 click==8.4.2 sqlalchemy==2.0.51
+    pip install pluggy==1.6.0 click==8.4.2 sqlalchemy==2.0.51 \
+                pygments==2.20.0 marshmallow==4.3.0 flask==3.1.2
     python benchmarks/score.py
 
 Reports, per target, where each labelled extension point ranks, plus recall@10,

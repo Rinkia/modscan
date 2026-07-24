@@ -188,6 +188,37 @@
           "justification": "Javadoc: 'InvocationInterceptor defines the API for Extensions that wish to intercept calls to test code.'"
         }
       ]
+    },
+    "flask": {
+      "version": "3.1.2",
+      "docs": "https://flask.palletsprojects.com/ — labels quote the docstrings shipped in the 3.1.2 wheel.",
+      "note": "Chosen because its ranking is GRADED rather than flat: at the top-10 cutoff exactly one candidate holds the cutoff score, so unlike every other target here recall@10 is not decided by the alphabetical tiebreak and this target can actually falsify a change. Partial list. Flask itself is excluded: its shipped docstring describes what the object does, never invites subclassing. Blueprint is excluded too: you construct one and register the instance, which the labelling rule counts as calling an API. Flask's largest extension surface - the before_request / errorhandler / template_filter decorators - cannot be labelled at all, because they are METHODS on the app object and the parser only takes top-level defs as seams. That blind spot is the point of adding this target, not a defect in it.",
+      "extension_points": [
+        {
+          "id": "flask.json.provider:JSONProvider",
+          "justification": "Class docstring: 'To implement a provider for a specific library, subclass this base class and implement at least dumps and loads.'"
+        },
+        {
+          "id": "flask.sessions:SessionInterface",
+          "justification": "Class docstring: 'The basic interface you have to implement in order to replace the default session interface'. Names the methods an implementer must provide."
+        },
+        {
+          "id": "flask.views:View",
+          "justification": "Class docstring: 'Subclass this class and override dispatch_request to create a generic class-based view.'"
+        },
+        {
+          "id": "flask.views:MethodView",
+          "justification": "Class docstring: dispatches request methods to instance methods - 'if you implement a get method, it will be used to handle GET requests'. Subclassed by the user to define the handlers."
+        },
+        {
+          "id": "flask.wrappers:Request",
+          "justification": "Class docstring: 'If you want to replace the request object used you can subclass this and set Flask.request_class to your subclass.'"
+        },
+        {
+          "id": "flask.wrappers:Response",
+          "justification": "Class docstring: 'If you want to replace the response object used you can subclass this and set Flask.response_class to your subclass.'"
+        }
+      ]
     }
   }
 }

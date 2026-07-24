@@ -46,7 +46,7 @@
     "sqlalchemy": {
       "version": "2.0.51",
       "docs": "https://docs.sqlalchemy.org/",
-      "note": "Deliberately partial. SQLAlchemy documents more seams than are labelled here; recall against a partial list is still a valid regression signal.",
+      "note": "Deliberately partial. SQLAlchemy documents more seams than are labelled here; recall against a partial list is still a valid regression signal. Function labels added 2026-07-23: @compiles and @listens_for are registration points a user decorates their own function with.",
       "extension_points": [
         {
           "id": "sqlalchemy.sql.type_api:TypeDecorator",
@@ -67,6 +67,14 @@
         {
           "id": "sqlalchemy.sql.ddl:ExecutableDDLElement",
           "justification": "Docs 'Custom DDL': custom DDL constructs are defined by subclassing ExecutableDDLElement and attaching a compiler."
+        },
+        {
+          "id": "sqlalchemy.ext.compiler:compiles",
+          "justification": "Docstring: 'Register a function as a compiler for a given ClauseElement type.' This is the compiler-registration mechanism the ranking work repeatedly identified as the extension contract for FunctionElement and ExecutableDDLElement."
+        },
+        {
+          "id": "sqlalchemy.event.api:listens_for",
+          "justification": "Docstring: 'Decorate a function as a listener for the given target + identifier ... part of the primary interface for the SQLAlchemy event system.'"
         }
       ]
     },
@@ -100,7 +108,7 @@
     "marshmallow": {
       "version": "4.3.0",
       "docs": "https://marshmallow.readthedocs.io/",
-      "note": "Added to test whether override-point generalizes. It does NOT here: marshmallow 4.x defines Field._serialize/_deserialize as noops, not NotImplementedError raisers, so the override-point signal never fires and Field stays missed. Schema is caught by re-export. An honest generalization gap.",
+      "note": "Added to test whether override-point generalizes. It does NOT here: marshmallow 4.x defines Field._serialize/_deserialize as noops, not NotImplementedError raisers, so the override-point signal never fires and Field stays missed. Schema is caught by re-export. An honest generalization gap. Function labels added 2026-07-23: the decorators module registers user methods into the schema lifecycle. Partial - pre_dump/post_load/validates_schema are documented identically and deliberately not all labelled.",
       "extension_points": [
         {
           "id": "marshmallow.schema:Schema",
@@ -113,6 +121,18 @@
         {
           "id": "marshmallow.validate:Validator",
           "justification": "Docs 'Validation - Validator classes': a reusable validator is written as a class extending the Validator base and implementing __call__."
+        },
+        {
+          "id": "marshmallow.decorators:pre_load",
+          "justification": "Docstring: 'Register a method to invoke before deserializing an object.' A user registers their own method against the schema lifecycle."
+        },
+        {
+          "id": "marshmallow.decorators:post_dump",
+          "justification": "Docstring: 'Register a method to invoke after serializing an object.'"
+        },
+        {
+          "id": "marshmallow.decorators:validates",
+          "justification": "Docstring: 'Register a validator method for field(s).'"
         }
       ]
     },

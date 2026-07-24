@@ -29,7 +29,14 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "benchmarks"))
 
-from score import median_rank, normalise_id, precision_at_k, recall_at_k  # noqa: E402
+from score import (  # noqa: E402
+    median_rank,
+    normalise_id,
+    precision_at_k,
+    recall_at_k,
+    recall_bounds,
+    tie_bounds,
+)
 
 
 def test_normalise_id_qualifies_a_relative_module() -> None:
@@ -87,6 +94,43 @@ def test_a_lost_seam_cannot_improve_the_median() -> None:
     assert if_it_were_dropped < before, "dropping a lost seam would flatter the score"
 
 
+def test_tie_bounds_span_the_whole_band() -> None:
+    """Every point in a band shares its bounds — the printed rank is the alphabet."""
+    scores = [1.0, 1.0, 1.0, 0.8, 0.8, 0.1]
+    assert tie_bounds(scores, 1) == (1, 3)
+    assert tie_bounds(scores, 3) == (1, 3), "last of a band could have been first"
+    assert tie_bounds(scores, 4) == (4, 5)
+    assert tie_bounds(scores, 6) == (6, 6), "a point alone at its score has no ambiguity"
+
+
+def test_recall_bounds_expose_an_alphabet_decided_score() -> None:
+    """JUnit's shape: 18 candidates tied at 1.00, 7 of them labelled.
+
+    Printed recall is 4/7, but every label could have ranked first or last in the
+    band, so the ranking itself supports anything from 0 to 7.
+    """
+    bounds = {f"label{i}": (1, 18) for i in range(7)}
+    assert recall_bounds(bounds, 10) == (0, 7)
+
+
+def test_recall_bounds_agree_when_nothing_is_tied_across_the_cutoff() -> None:
+    """Bands that sit entirely inside or outside the top k are not ambiguous."""
+    bounds = {"in": (1, 4), "out": (30, 40)}
+    assert recall_bounds(bounds, 10) == (1, 1)
+
+
+def test_lower_bound_is_the_honest_reading() -> None:
+    """The accept bar: a change is real only if the LOWER bound moves.
+
+    pluggy prints a perfect 3/3 while every one of its labels sits in a 13-wide
+    band at 0.8 — the ranking on its own guarantees none of them.
+    """
+    pluggy_shaped = {f"label{i}": (1, 13) for i in range(3)}
+    worst, best = recall_bounds(pluggy_shaped, 10)
+    assert (worst, best) == (0, 3)
+    assert worst == 0, "a 3/3 that no tie order guarantees is not a regression canary"
+
+
 if __name__ == "__main__":
     test_normalise_id_qualifies_a_relative_module()
     test_normalise_id_leaves_an_already_qualified_module_alone()
@@ -95,4 +139,8 @@ if __name__ == "__main__":
     test_precision_is_out_of_k_and_so_has_a_ceiling()
     test_median_rank_matches_the_published_baseline()
     test_a_lost_seam_cannot_improve_the_median()
+    test_tie_bounds_span_the_whole_band()
+    test_recall_bounds_expose_an_alphabet_decided_score()
+    test_recall_bounds_agree_when_nothing_is_tied_across_the_cutoff()
+    test_lower_bound_is_the_honest_reading()
     print("OK: benchmark scoring self-check passed")

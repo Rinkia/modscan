@@ -489,6 +489,66 @@ What actually changed is what the benchmark can *see*:
 marshmallow moves 1/3 → 4/6, SQLAlchemy 1/5 → **1/7** — it gained two labels and
 caught neither.
 
+## Ties: how much of the score the alphabet owns
+
+`detect_extension_points` breaks score ties on `(module, lineno)` — that is,
+alphabetically. When a band of equally-scored candidates straddles rank 10, the
+alphabet decides which labels count as hits. JUnit made this impossible to
+ignore; measuring it across every target showed the problem is not JUnit's.
+
+`score.py` now reports **tie bounds** alongside recall: the score if every tie
+broke in the ranking's favour, and if every tie broke against it.
+
+| Target | recall@10 | Tie bounds | Band at the cutoff |
+|---|---|---|---|
+| click 8.4.2 | 4/4 | 2..4 | 71 tied at 0.8, 6 slots |
+| commander 14.0.2 | 2/2 | 0..2 | 11 tied at 0.1, 10 slots |
+| junit-jupiter-api 5.11.3 | 4/7 | **0..7** | 18 tied at 1.00, 10 slots |
+| marshmallow 4.3.0 | 4/6 | 4..5 | 4 tied at 0.7, 1 slot |
+| pluggy 1.6.0 | 3/3 | **0..3** | 13 tied at 0.8, 10 slots |
+| pygments 2.20.0 | 0/5 | 0..0 | — |
+| sqlalchemy 2.0.51 | 1/7 | 0..2 | 50 tied at 1.00, 10 slots |
+| **Aggregate** | **18/34** | **6..23** | 17 of 34 labels are tie-decided |
+
+Three consequences, none of them comfortable:
+
+1. **Half the headline is not evidence.** 18/34 is one sample from an interval
+   the ranking itself does not narrow. A change is real only if it moves the
+   **lower bound**.
+2. **The regression canaries were never canaries.** click's perfect 4/4 has a
+   lower bound of 2/4 and pluggy's 3/3 a lower bound of **0/3** — no tie order is
+   guaranteed by the ranking. Neither can falsify a change on its own.
+3. **JUnit and SQLAlchemy are *not* the same problem**, despite looking alike.
+
+### JUnit's band is not noise — the metric is wrong, not the ranking
+
+All eighteen candidates tied at 1.00 live in `org.junit.jupiter.api.extension`
+and implement `Extension`. Every one of them is a genuine extension point; the
+seven labels are a *partial list of eighteen correct answers*. The ranking put
+18/18 real seams in the top 18 and scored 4/7 for it.
+
+No tiebreak signal is warranted here. There is nothing to discriminate.
+
+SQLAlchemy's 50-wide band at 1.00 is the opposite: `Dialect`,
+`CreateEnginePlugin` and `TypeDecorator` sit among `NoCursorDQLFetchStrategy`,
+`ORMStatementAdapter` and internal fetch strategies. That band *does* need a
+discriminator — it is a ranking failure, not a metric artefact.
+
+### Rejected: the unclamped signal sum as a tiebreak
+
+`score` is `min(sum, 1.0)`, so the clamp discards how *much* evidence a point
+carried. Using the raw sum as a tiebreak reorders only within a band and can
+never move a point across a boundary — a free lever, if it correlates.
+
+**It is anti-correlated. Measured: 18/34 → 15/34.** Ranking by number of signals
+instead gives the same 15/34. Inside JUnit's band the extra signal is an override
+point, which the *derived* handler interfaces carry and the base `Extension` does
+not; in SQLAlchemy it promotes internal machinery that happens to be abstract,
+role-named *and* re-exported. More evidence is not better evidence — the
+alphabet, chosen arbitrarily, beats both.
+
+Recorded so nobody re-derives it. The clamp is not hiding a usable signal.
+
 ## What this benchmark still cannot measure well
 
 Function labels now exist, but only five of thirty-four — and three of those
@@ -572,8 +632,15 @@ Three things this measurement settled:
 rather than the four a single small target gives, and it does not reward
 skewing effort at the easiest target.
 
+**Recall@10 is reported with tie bounds, and the lower bound is the honest
+reading.** See "Ties: how much of the score the alphabet owns" — 17 of 34 labels
+currently sit in a band straddling rank 10, so the headline is one sample from
+6..23. A heuristic change that moves only the printed figure moved the alphabet.
+
 **Per-target recall@10 is a regression guard, not a target to maximise.** click
-is the canary — it already works, and it must not fall.
+is the canary — it already works, and it must not fall. With a lower bound of
+2/4 (pluggy's is 0/3) that guard is weaker than it reads: a canary whose perfect
+score no tie order guarantees cannot falsify a change by itself.
 
 **Median rank of the labelled seams is reported alongside.** It is continuous
 and moves before recall does. This matters because recall@10 is *blind* to real

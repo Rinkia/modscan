@@ -33,7 +33,7 @@ from modscan.detector import (  # noqa: E402
     SIGNAL_CATALOG,
     detect_extension_points,
 )
-from tests.test_parser import FIXTURE, _write_fixture  # noqa: E402
+from tests.test_parser import _write_fixture  # noqa: E402
 
 
 def test_detector_ranking() -> None:

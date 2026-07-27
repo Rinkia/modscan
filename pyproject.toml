@@ -62,3 +62,15 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["modscan*"]
+
+[tool.ruff.lint.per-file-ignores]
+# The package exposes __version__ (via an importlib.metadata probe) and attaches
+# a logging NullHandler before re-exporting its public API. Both must run at
+# import time, so the API imports legitimately follow them — E402 does not apply.
+"modscan/__init__.py" = ["E402"]
+
+[tool.pytest.ini_options]
+# Scope collection to modscan's own suite. The repo also contains vendored
+# sample apps under usage-crosscheck/ and security-crosscheck/ used as scan
+# targets; collecting those pulls in third-party test files with unmet deps.
+testpaths = ["tests"]

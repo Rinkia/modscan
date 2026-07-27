@@ -154,7 +154,7 @@ def _java_package_dir(target: str, pinned: str) -> str:
 
 def _skip_reason_java(target: str, pinned: str) -> str | None:
     if not os.path.isdir(_java_package_dir(target, pinned)):
-        return f"not fetched - python benchmarks/java/fetch.py"
+        return "not fetched - python benchmarks/java/fetch.py"
     try:
         import tree_sitter  # noqa: F401
         import tree_sitter_java  # noqa: F401
@@ -166,10 +166,10 @@ def _skip_reason_java(target: str, pinned: str) -> str | None:
 def _skip_reason_js(target: str, pinned: str) -> str | None:
     """Why a JS/TS target cannot be scored, or None if it can be."""
     if not os.path.isdir(_js_package_dir(target)):
-        return f"not installed - cd benchmarks/js && npm install"
+        return "not installed - cd benchmarks/js && npm install"
     installed = _js_version(target)
     if installed is None:
-        return f"no package.json version - cd benchmarks/js && npm install"
+        return "no package.json version - cd benchmarks/js && npm install"
     if installed != pinned:
         return (
             f"installed {installed}, labels are for {pinned} - "

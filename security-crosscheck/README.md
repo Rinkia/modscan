@@ -6,31 +6,51 @@ Two checks live here, one per language:
 |---|---|---|---|
 | Python | [Bandit](https://github.com/PyCQA/bandit) | `crosscheck.py` | 27/27 in-scope |
 | TypeScript / JavaScript | [eslint-plugin-security](https://github.com/eslint-community/eslint-plugin-security) | `crosscheck_ts.py` | 10/10 in-scope |
-| **Java** | — | — | **not validated yet** |
+| Java | [Semgrep `p/security-audit`](https://semgrep.dev/p/security-audit) | `crosscheck_java.py` | 1/1 containment (see below) |
 
-## Java is the gap, and it is a structural one
+## Java
 
-The Java sink catalog (`modscan/security/sinks_java.py`) ships without a
-cross-check, which makes it the least proven of the three. This is not an
-oversight to be fixed by writing another script like the two above.
+```bash
+python security-crosscheck/crosscheck_java.py   # needs Docker
+```
 
-The obvious authority is **find-sec-bugs**, the SpotBugs plugin the catalog is
-modelled on — its detector names are cited per catalog entry. But SpotBugs
-analyses **bytecode**, and MODScan reads source. Every Java target here is a
-Maven `-sources.jar`. Comparing the two therefore needs either:
+The obvious authority was **find-sec-bugs**, the SpotBugs plugin the catalog is
+modelled on — but SpotBugs analyses **bytecode** while MODScan reads source, and
+the targets are Maven `-sources.jar`s. Comparing them would need a compile step
+with a resolved classpath per target. So the check uses **Semgrep**, which works
+on source, via its `p/security-audit` ruleset.
 
-- a **compile step** in the harness (a JDK, a resolved classpath per target, and
-  a build that succeeds for a sources jar with no build file — the classpath is
-  the hard part, not the compiler), or
-- a **source-level authority** instead. Semgrep has Java rules and works on
-  source, which would sidestep the whole problem, at the cost of a less
-  authoritative comparison than the tool the catalog was actually modelled on.
+Two things make this check read differently from the other two, and both are the
+point rather than caveats.
 
-Until one of those exists, the Java catalog rests on its self-check and a smoke
-run over real sources (snakeyaml, xstream, spring-expression, commons-lang3),
-which is weaker evidence than the other two languages have. `README.md` says so
-where users will see it, rather than letting Java ride on the Python and
-TypeScript numbers.
+**It runs in Docker, because Semgrep cannot run on native Windows.**
+`semgrep-core` fails at `socketpair`; the official `semgrep/semgrep` image is how
+it runs here and how it would run in CI. `crosscheck_java.py` checks for Docker
+and says so if it is missing.
+
+**It measures containment, not recall.** Bandit and eslint-plugin-security
+enumerate, like the lens, so a finding-for-finding recall means something.
+Semgrep's Java security rules are mostly **taint-mode** — they fire only when
+data flows from a source to the sink, and library source has no entry points, so
+Semgrep reports almost nothing on it: across xstream, snakeyaml, commons-lang3
+and spring-expression it produced exactly **one** in-scope finding. "Lens-only"
+is therefore not a false-positive count, exactly as `__reduce__` is not against
+Bandit. The meaningful direction is the other one: **every sink Semgrep does
+confirm must appear in the lens**, because the lens claims to enumerate a
+superset. The harness measures that containment.
+
+**It has already earned its keep.** The one Semgrep finding —
+`SerializationUtils.java` in commons-lang3 — was initially *missed* by the lens:
+the `ObjectInputStream` was declared in a `try (…)` resource header, a node the
+type resolver did not read, so the `readObject()` call on it went unresolved. The
+cross-check turned that into a `0/1` gap, which is how the bug was found and
+fixed. Now `1/1`.
+
+The honest limitation: one taint-confirmed finding is thin evidence. Semgrep is
+the wrong *shape* of authority for an enumeration lens on library code, and this
+check can only ever confirm the handful of sinks its taint model reaches. It is
+real, external and non-circular, but weaker than the Python and TypeScript
+checks, and `README.md` says so where users see it.
 
 ## TypeScript / JavaScript
 

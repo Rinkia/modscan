@@ -82,50 +82,67 @@ def _bare_type(text: str) -> str:
 
 
 def _collect_types(root_node, src: bytes) -> dict[str, str]:
-    """Variable and field name -> declared type, for the whole file.
+    """Variable/field name -> the set of types bound to it anywhere in the file.
 
-    One flat map per file: Java shadowing is rare enough in the shapes this
-    catalog cares about that scope tracking would buy accuracy nobody would
-    notice, and cost a walk that has to model blocks.
+    A *set*, not one type, because a file reuses a name: commons-lang3's
+    SerializationUtils binds `in` to both `ClassLoaderAwareObjectInputStream` and
+    `ObjectInputStream`, and a last-write-wins map silently drops one, so the
+    `in.readObject()` under the losing binding goes unreported. This was the miss
+    the Semgrep cross-check caught. Tracking every bound type over-approximates
+    only for a reused name, and the failure mode is then over-reporting a sink to
+    review rather than hiding one — the side the lens deliberately errs on. Full
+    scope analysis would disambiguate, at a cost this catalog does not need.
     """
-    types: dict[str, str] = {}
+    types: dict[str, set[str]] = {}
+
+    def bind(name_node, type_node) -> None:
+        if name_node is not None and type_node is not None:
+            types.setdefault(_text(name_node, src), set()).add(_bare_type(_text(type_node, src)))
+
     stack = [root_node]
     while stack:
         node = stack.pop()
         stack.extend(node.children)
+        # A try-with-resources header binds a typed variable too
+        # (`try (ObjectInputStream in = ...)`) but as a `resource` node carrying
+        # its own type+name fields, not a variable_declarator — miss it and every
+        # sink called on a resource (the idiomatic way to use ObjectInputStream)
+        # goes unresolved. Found by the Semgrep cross-check on commons-lang3.
+        if node.type == "resource":
+            bind(node.child_by_field_name("name"), node.child_by_field_name("type"))
+            continue
         if node.type not in ("local_variable_declaration", "field_declaration"):
             continue
         type_node = node.child_by_field_name("type")
-        if type_node is None:
-            continue
-        declared = _bare_type(_text(type_node, src))
         for child in node.children:
-            if child.type != "variable_declarator":
-                continue
-            name = child.child_by_field_name("name")
-            if name is not None:
-                types[_text(name, src)] = declared
+            if child.type == "variable_declarator":
+                bind(child.child_by_field_name("name"), type_node)
     return types
 
 
-def _receiver_type(node, src: bytes, types: dict[str, str]) -> str:
-    """Type of a call's receiver, or "" when it cannot be resolved file-locally."""
+def _receiver_types(node, src: bytes, types: dict[str, set[str]]) -> set[str]:
+    """Candidate types of a call's receiver, or empty when unresolved file-locally.
+
+    A set because a reused variable name may carry several declared types (see
+    `_collect_types`). The caller matches the catalog against each candidate.
+    """
     if node is None:
-        return ""
+        return set()
     if node.type == "identifier":
         name = _text(node, src)
-        # A declared variable resolves to its type; otherwise the identifier is
-        # itself a type name, which is how a static call reads (`Class.forName`).
-        return types.get(name, name)
+        # A declared variable resolves to its bound type(s); otherwise the
+        # identifier is itself a type name, which is how a static call reads
+        # (`Class.forName`).
+        return types.get(name) or {name}
     if node.type == "object_creation_expression":
         created = node.child_by_field_name("type")
-        return _bare_type(_text(created, src)) if created is not None else ""
+        return {_bare_type(_text(created, src))} if created is not None else set()
     if node.type == "method_invocation":
         # `Runtime.getRuntime().exec(...)`: the chain's own receiver is the type.
-        return _receiver_type(node.child_by_field_name("object"), src, types)
+        return _receiver_types(node.child_by_field_name("object"), src, types)
     if node.type in ("field_access", "scoped_identifier"):
-        return _bare_type(_text(node, src))
-    return ""
+        return {_bare_type(_text(node, src))}
+    return set()
 
 
 # --- shell elevation ---------------------------------------------------------
@@ -206,13 +223,17 @@ def _sinks_in_file(path: str, root: str, parser) -> list[RiskSink]:
             if name_node is None:
                 continue
             method = _text(name_node, src)
-            receiver = _receiver_type(node.child_by_field_name("object"), src, types)
-            spec = match_typed_call(receiver, method)
+            spec = matched = None
+            for receiver in _receiver_types(node.child_by_field_name("object"), src, types):
+                spec = match_typed_call(receiver, method)
+                if spec is not None:
+                    matched = receiver
+                    break
             if spec is None:
                 continue
             if spec.elevate_on_shell and _names_a_shell(node, src):
                 spec = spec.elevated()
-            found.append(_sink(spec, module, f"{receiver}.{method}", node))
+            found.append(_sink(spec, module, f"{matched}.{method}", node))
             continue
 
         if node.type == "object_creation_expression":

@@ -221,13 +221,16 @@ Because Java has no bare `eval` and every sink is a method on some object, the
 receiver's **declared type** is resolved per file — so `yaml.load(s)` fires and
 `props.load(r)` does not.
 
-**Coverage is not equal across the three languages.** The Python and
-TypeScript catalogs are cross-checked against Bandit (27/27 in scope) and
-eslint-plugin-security (10/10); **the Java catalog is not yet validated against
-an external authority.** find-sec-bugs, the obvious candidate, analyses
-*bytecode*, and MODScan reads source — so that check needs either a source-level
-authority or a compile step, and neither is built. Treat the Java report as
-newer and less proven than the other two.
+**Coverage is not equal across the three languages.** All three catalogs are
+cross-checked against an external authority — Bandit (27/27 in scope),
+eslint-plugin-security (10/10), and **Semgrep `p/security-audit` for Java** — but
+the Java check is weaker by nature. Semgrep's Java rules are taint-based and
+report almost nothing on library source, so the check measures *containment* (is
+every sink Semgrep confirms also in the lens?) rather than recall, on a single
+confirmed finding. It is real and non-circular — it already caught a
+try-with-resources gap in the Java detector — but treat the Java catalog as
+newer and less proven than the other two. See
+[`security-crosscheck/`](security-crosscheck/).
 
 The diff identifies a sink by `(id, module, call)` and compares counts, so moved
 code is never reported as a change — but a third `eval` added to a module that

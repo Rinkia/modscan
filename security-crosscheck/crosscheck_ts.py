@@ -123,8 +123,8 @@ def _matched(item: tuple[str, int], others: set[tuple[str, int]]) -> bool:
     path, line = item
     stem = os.path.splitext(path)[0]
     return any(
-        os.path.splitext(p)[0] == stem and abs(l - line) <= LINE_TOLERANCE
-        for p, l in others
+        os.path.splitext(p)[0] == stem and abs(ln - line) <= LINE_TOLERANCE
+        for p, ln in others
     )
 
 

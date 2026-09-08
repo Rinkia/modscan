@@ -552,6 +552,47 @@ alphabet, chosen arbitrarily, beats both.
 
 Recorded so nobody re-derives it. The clamp is not hiding a usable signal.
 
+### Rejected: separating SQLAlchemy's 1.00 band by score, and why the second authority settles it
+
+SQLAlchemy's flat band at the maximum score is the one remaining ranking failure
+(JUnit's band turned out to be the metric, not the ranking — see below). Fifty
+candidates tie at 1.00, three of them labelled (`Dialect`, `CreateEnginePlugin`,
+`TypeDecorator`), and the tie-bounds work makes the goal precise: the only way to
+lift the guaranteed recall is a **score change that splits the band**, because no
+tiebreak can raise a lower bound — the worst case *is* a tie order.
+
+Two things were measured and both rejected.
+
+**A tiebreak cannot help, by construction.** Reordering within the band —
+by re-export, by override point, by either combined — leaves every bound
+unchanged (`9..26` before and after). Confirmed across all eight targets.
+
+**Splitting the band by un-clamping the score does separate the noise, but not
+the labels.** The band is inflated two ways: internal machinery scoring
+`CLASSROLE + BASEROLE` (`0.45 + 0.45 + 0.1 = 1.0` — the cursor fetch strategies,
+the ORM adapters) and real bases scoring `REEXPORT + OVERRIDE`
+(`0.7 + 0.3 + 0.1 = 1.1`, clamped down to `1.0`). Un-clamping pushes the
+machinery below the bases — a genuine improvement — but the labels then land in a
+**nineteen-wide band at 1.10**, tied with `Transaction`, `Result`, `Pool`,
+`Executable`, `Compiled` and a dozen other re-exported classes with override
+points. `Dialect` sits at rank 14, `TypeDecorator` at 31; the lower bound does
+not move, and the aggregate *best* regresses `26 → 24`. Fails the accept bar.
+
+There is no static signal that separates `Dialect` from those nineteen, and the
+[usage cross-check](../../usage-crosscheck/) says exactly why. The property that
+distinguishes them is **who gets subclassed downstream**: every database driver
+subclasses `Dialect`; nobody subclasses `Transaction` or `Result` (you receive
+instances of those). That is a real, measurable discriminator — and it is the one
+signal a single-package static scan cannot see, which is precisely why the usage
+cross-check is a *judge* and not a detector weight. This is the same wall the
+rejected whole-program-resolution work hit, now stated from the other side: we
+know what the missing signal is, we can even measure it out-of-band, and it lives
+in code the scan is not allowed to read.
+
+Sixth rejection on this band. The honest conclusion is that SQLAlchemy's maximum
+band is at its static ceiling; lifting it needs downstream evidence, which is a
+different tool (the usage cross-check) rather than a cleverer heuristic.
+
 ## Flask: the first target that can falsify a change
 
 Measuring ties exposed a problem the aggregate had been hiding: **every target

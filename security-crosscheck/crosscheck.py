@@ -118,7 +118,7 @@ def _lens(root: str) -> set[tuple[str, int]]:
 def _matched(a: tuple[str, int], others: set[tuple[str, int]]) -> bool:
     """True if `a` has a counterpart in `others` within LINE_TOLERANCE."""
     path, line = a
-    return any(p == path and abs(l - line) <= LINE_TOLERANCE for p, l in others)
+    return any(p == path and abs(ln - line) <= LINE_TOLERANCE for p, ln in others)
 
 
 def compare(root: str) -> tuple[int, int, int, list[tuple[str, int]]]:

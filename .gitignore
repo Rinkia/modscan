@@ -39,3 +39,7 @@ benchmarks/java/*-*/
 # Downstream plugin packages for the usage cross-check. Pinned in
 # usage-crosscheck/downstream.json, installed with --target, never committed.
 usage-crosscheck/downstream/
+
+# Java sources the Semgrep cross-check fetches from Maven Central; pinned in
+# crosscheck_java.py, unpacked on demand, never committed (like benchmarks/java).
+security-crosscheck/java-targets/

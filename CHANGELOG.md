@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Java attack surface: sinks called on a `try`-with-resources variable are no
+  longer missed.** `modscan-audit --language java` resolves a call's receiver
+  type from the file's declarations, but a resource declared in a
+  `try (ObjectInputStream in = …)` header is a different AST node than an ordinary
+  declaration and was not read — so `in.readObject()`, the idiomatic way
+  `ObjectInputStream` is used, went unreported. The resolver now reads resource
+  headers, and tracks every type bound to a reused variable name rather than only
+  the last, so a file that binds one name to two stream types reports the sinks
+  under both. Found by a new Semgrep cross-check (`security-crosscheck/`) against
+  commons-lang3.
+
 ## [0.1.8] - 2026-09-08
 
 ### Added

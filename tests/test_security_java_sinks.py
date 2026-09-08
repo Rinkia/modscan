@@ -159,6 +159,52 @@ def test_one_spawn_written_two_ways_is_reported_once() -> None:
     assert len(sinks) == 1, sinks
 
 
+def test_try_with_resources_receiver_is_resolved() -> None:
+    """The gap the Semgrep cross-check caught on commons-lang3.
+
+    An ObjectInputStream declared in a `try (...)` resource header is a different
+    AST node than a plain local; missing it means `in.readObject()` — the
+    idiomatic use — goes unresolved and unreported.
+    """
+    src = (
+        "package d;\n"
+        "import java.io.ObjectInputStream;\n"
+        "public class R {\n"
+        "  Object go(java.io.InputStream s) throws Exception {\n"
+        "    try (ObjectInputStream in = new ObjectInputStream(s)) {\n"
+        "      return in.readObject();\n"
+        "    }\n"
+        "  }\n"
+        "}\n"
+    )
+    sinks = _scan({"R.java": src})
+    assert any(s.id == "MS-SEC-JAVADESER" for s in sinks), sinks
+
+
+def test_a_reused_name_bound_to_two_stream_types_reports_both() -> None:
+    """commons-lang3's exact shape: one file binds `in` to two ObjectInputStream
+    types, and a last-write-wins map dropped one call. Both must fire."""
+    src = (
+        "package d;\n"
+        "import java.io.ObjectInputStream;\n"
+        "public class Two {\n"
+        "  static class Aware extends ObjectInputStream {\n"
+        "    Aware(java.io.InputStream s) throws Exception { super(s); }\n"
+        "  }\n"
+        "  Object a(java.io.InputStream s) throws Exception {\n"
+        "    try (Aware in = new Aware(s)) { return in.readObject(); }\n"
+        "  }\n"
+        "  Object b(java.io.InputStream s) throws Exception {\n"
+        "    try (ObjectInputStream in = new ObjectInputStream(s)) { return in.readObject(); }\n"
+        "  }\n"
+        "}\n"
+    )
+    lines = {s.lineno for s in _scan({"Two.java": src}) if s.id == "MS-SEC-JAVADESER"}
+    # only the ObjectInputStream call is catalogued (Aware is an unknown type),
+    # but the reused name must not let it shadow the real one away.
+    assert 11 in lines, f"the ObjectInputStream.readObject at line 11 must fire; got {lines}"
+
+
 def test_catalog_integrity() -> None:
     """Every spec is well-formed and stays inside the categories the lens claims."""
     specs = all_specs()
@@ -191,6 +237,8 @@ if __name__ == "__main__":
     test_a_deserialization_hook_needs_the_real_signature()
     test_a_named_shell_elevates_the_process_sink()
     test_one_spawn_written_two_ways_is_reported_once()
+    test_try_with_resources_receiver_is_resolved()
+    test_a_reused_name_bound_to_two_stream_types_reports_both()
     test_catalog_integrity()
     test_shared_ids_keep_their_cross_language_meaning()
     print("OK: Java security-sink self-check passed")
